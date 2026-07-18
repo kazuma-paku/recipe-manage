@@ -1,0 +1,2568 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>レシピ帳</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" href="favicon.png" type="image/png">
+  <meta name="theme-color" content="#5B7C5D">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="レシピ">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="format-detection" content="telephone=no">
+
+  <style>
+    html, body { margin: 0; padding: 0; }
+    * { box-sizing: border-box; }
+    body {
+      background: #FBFAF7;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: none;
+    }
+    .initial-loader {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      color: #6B7280; font-family: system-ui, sans-serif; font-size: 14px;
+    }
+    input, textarea, button { font-family: inherit; }
+    input, textarea { -webkit-appearance: none; appearance: none; }
+  </style>
+
+  <!-- ▼▼▼ Firebase設定：ここをあなたのプロジェクトの設定に書き換えてください ▼▼▼ -->
+  <script>
+    window.FIREBASE_CONFIG = {
+      apiKey: "AIzaSyClyhJxvYrCGYNrh3JgkJG3e1heWY22VgE",
+      authDomain: "recipe-manage-1eb55.firebaseapp.com",
+      projectId: "recipe-manage-1eb55",
+      storageBucket: "recipe-manage-1eb55.firebasestorage.app",
+      messagingSenderId: "788163948857",
+      appId: "1:788163948857:web:a536a857138c3ed64078e8"
+    };
+  </script>
+  <!-- ▲▲▲ ここまで ▲▲▲ -->
+
+  <!-- React + Firebase + Babel -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root">
+    <div class="initial-loader">読み込み中…</div>
+  </div>
+
+  <!-- アプリ本体 -->
+  <script type="text/babel" data-presets="react">
+/* レシピ帳 - Firebase同期対応版 */
+const { useState, useEffect, useRef } = React;
+
+// ========== アイコン（lucide互換） ==========
+const Icon = ({ children, size = 24, color = 'currentColor', fill = 'none', strokeWidth = 2, style, ...rest }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24"
+       fill={fill} stroke={color} strokeWidth={strokeWidth}
+       strokeLinecap="round" strokeLinejoin="round" style={style} {...rest}>{children}</svg>
+);
+const Search = (p) => <Icon {...p}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></Icon>;
+const Plus = (p) => <Icon {...p}><path d="M5 12h14"/><path d="M12 5v14"/></Icon>;
+const ChevronLeft = (p) => <Icon {...p}><path d="m15 18-6-6 6-6"/></Icon>;
+const Camera = (p) => <Icon {...p}><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></Icon>;
+const X = (p) => <Icon {...p}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></Icon>;
+const ShoppingCart = (p) => <Icon {...p}><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></Icon>;
+const Trash2 = (p) => <Icon {...p}><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></Icon>;
+const Check = (p) => <Icon {...p}><path d="M20 6 9 17l-5-5"/></Icon>;
+const BookOpen = (p) => <Icon {...p}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></Icon>;
+const Minus = (p) => <Icon {...p}><path d="M5 12h14"/></Icon>;
+const Heart = (p) => <Icon {...p}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></Icon>;
+const Copy = (p) => <Icon {...p}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></Icon>;
+const Clock = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Icon>;
+const Utensils = (p) => <Icon {...p}><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></Icon>;
+const Calendar = (p) => <Icon {...p}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></Icon>;
+const User = (p) => <Icon {...p}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></Icon>;
+const ArchiveRestore = (p) => <Icon {...p}><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h2"/><path d="M20 8v11a2 2 0 0 1-2 2h-2"/><path d="m9 15 3-3 3 3"/><path d="M12 12v9"/></Icon>;
+const SlidersHorizontal = (p) => <Icon {...p}><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></Icon>;
+const Settings = (p) => <Icon {...p}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></Icon>;
+const Download = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></Icon>;
+const Upload = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></Icon>;
+const Share2 = (p) => <Icon {...p}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></Icon>;
+const LogOut = (p) => <Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></Icon>;
+const ArrowUpDown = (p) => <Icon {...p}><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></Icon>;
+const Trophy = (p) => <Icon {...p}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></Icon>;
+const Flame = (p) => <Icon {...p}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></Icon>;
+const CheckCircle = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></Icon>;
+const Sparkles = (p) => <Icon {...p}><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></Icon>;
+const RotateCcw = (p) => <Icon {...p}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></Icon>;
+const Moon = (p) => <Icon {...p}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></Icon>;
+const Salad = (p) => <Icon {...p}><path d="M7 21h10"/><path d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z"/><path d="M11.38 12a2.4 2.4 0 0 1-.4-4.77 2.4 2.4 0 0 1 3.2-2.77 2.4 2.4 0 0 1 3.47-.63 2.4 2.4 0 0 1 3.37 3.37 2.4 2.4 0 0 1-1.1 3.7 2.51 2.51 0 0 1 .03 1.1"/><path d="m13 12 4-4"/><path d="M10.9 7.25A3.99 3.99 0 0 0 4 10c0 .73.2 1.41.54 2"/></Icon>;
+
+// ========== 色・フォント・定数 ==========
+const colors = {
+  bg: '#FBFAF7', card: '#FFFFFF', ink: '#1F2937', muted: '#6B7280',
+  line: '#E8E4DB', accent: '#5B7C5D', accentSoft: '#EEF2ED',
+  danger: '#B85450', favorite: '#D97070', warn: '#C88450',
+};
+const fontStack = '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Hiragino Maru Gothic Pro", "Yu Gothic UI", system-ui, -apple-system, sans-serif';
+const TRASH_TTL = 24 * 60 * 60 * 1000;
+const DEFAULT_FILTERS = {
+  query: '', tags: [], ingredients: [], authors: [],
+  servingsMin: '', servingsMax: '', cookTimeMax: '', favOnly: false,
+  sortBy: 'newest',
+};
+const SORT_OPTIONS = [
+  { value: 'newest', label: '新しい順' },
+  { value: 'oldest', label: '古い順' },
+  { value: 'mostCooked', label: 'よく作る順' },
+  { value: 'leastCooked', label: '作ってない順' },
+  { value: 'recentlyCooked', label: '最近作った順' },
+];
+const GROUP_CODE_KEY = 'recipeAppGroupCode';
+
+// ========== ユーティリティ ==========
+async function compressImage(file, maxWidth = 800, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ratio = Math.min(maxWidth / img.width, maxWidth / img.height, 1);
+        canvas.width = img.width * ratio; canvas.height = img.height * ratio;
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject; img.src = e.target.result;
+    };
+    reader.onerror = reject; reader.readAsDataURL(file);
+  });
+}
+function scaleAmount(amount, ratio) {
+  if (typeof amount !== 'number') return amount;
+  const s = amount * ratio;
+  if (s >= 10) return Math.round(s);
+  if (s >= 1) return Math.round(s * 10) / 10;
+  return Math.round(s * 100) / 100;
+}
+function daysAgo(ts) {
+  const now = new Date(), then = new Date(ts);
+  const a = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const b = new Date(then.getFullYear(), then.getMonth(), then.getDate());
+  return Math.floor((a - b) / (1000 * 60 * 60 * 24));
+}
+function daysAgoLabel(ts) {
+  const d = daysAgo(ts);
+  if (d === 0) return '今日';
+  if (d === 1) return '昨日';
+  if (d < 0) return `${-d}日後`;
+  return `${d}日前`;
+}
+function freshnessColor(ts) {
+  const d = daysAgo(ts);
+  if (d <= 2) return colors.accent;
+  if (d <= 4) return colors.muted;
+  return colors.warn;
+}
+function toDateInputValue(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function fromDateInputValue(str) {
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d, 12, 0, 0).getTime();
+}
+function trashHoursRemaining(deletedAt) {
+  const r = TRASH_TTL - (Date.now() - deletedAt);
+  return Math.max(0, Math.ceil(r / (60 * 60 * 1000)));
+}
+function hasServings(recipe) {
+  return typeof recipe.baseServings === 'number' && recipe.baseServings > 0;
+}
+function applyFilters(recipes, filters) {
+  return recipes.filter(r => {
+    const q = filters.query.trim().toLowerCase();
+    if (q) {
+      const inTitle = r.title.toLowerCase().includes(q);
+      const inIng = (r.ingredients || []).some(i => i.name.toLowerCase().includes(q));
+      const inAuthor = r.author && r.author.toLowerCase().includes(q);
+      const inNotes = r.notes && r.notes.toLowerCase().includes(q);
+      if (!inTitle && !inIng && !inAuthor && !inNotes) return false;
+    }
+    if (filters.tags.length > 0 && !filters.tags.every(t => (r.tags || []).includes(t))) return false;
+    if (filters.ingredients.length > 0) {
+      const ri = (r.ingredients || []).map(i => i.name);
+      if (!filters.ingredients.every(fi => ri.includes(fi))) return false;
+    }
+    if (filters.authors.length > 0 && (!r.author || !filters.authors.includes(r.author))) return false;
+    if (filters.servingsMin !== '' && filters.servingsMin != null) {
+      if (!hasServings(r) || r.baseServings < Number(filters.servingsMin)) return false;
+    }
+    if (filters.servingsMax !== '' && filters.servingsMax != null) {
+      if (!hasServings(r) || r.baseServings > Number(filters.servingsMax)) return false;
+    }
+    if (filters.cookTimeMax !== '' && filters.cookTimeMax != null) {
+      if (!r.cookTime || r.cookTime > Number(filters.cookTimeMax)) return false;
+    }
+    if (filters.favOnly && !r.favorite) return false;
+    return true;
+  });
+}
+function countActiveFilters(filters) {
+  let n = filters.tags.length + filters.ingredients.length + filters.authors.length;
+  if (filters.servingsMin !== '' || filters.servingsMax !== '') n++;
+  if (filters.cookTimeMax !== '') n++;
+  if (filters.favOnly) n++;
+  return n;
+}
+function sortRecipes(recipes, sortBy) {
+  const arr = [...recipes];
+  switch (sortBy) {
+    case 'oldest':
+      return arr.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    case 'mostCooked':
+      return arr.sort((a, b) => (b.cookCount || 0) - (a.cookCount || 0) || (b.createdAt || 0) - (a.createdAt || 0));
+    case 'leastCooked':
+      return arr.sort((a, b) => (a.cookCount || 0) - (b.cookCount || 0) || (b.createdAt || 0) - (a.createdAt || 0));
+    case 'recentlyCooked':
+      return arr.sort((a, b) => (b.lastCookedAt || 0) - (a.lastCookedAt || 0) || (b.createdAt || 0) - (a.createdAt || 0));
+    case 'newest':
+    default:
+      return arr.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }
+}
+function formatRecipeAsText(recipe) {
+  const lines = [];
+  lines.push(`【${recipe.title}】`);
+  if (recipe.author) lines.push(`by ${recipe.author}`);
+  lines.push('');
+  const required = (recipe.ingredients || []).filter(i => !i.optional);
+  const optional = (recipe.ingredients || []).filter(i => i.optional);
+  if (required.length > 0 || optional.length > 0) {
+    if (hasServings(recipe)) lines.push(`▼材料（${recipe.baseServings}人分）`);
+    else lines.push('▼材料');
+    required.forEach(i => {
+      const amt = i.amount !== '' && i.amount != null ? `${i.amount}${i.unit || ''}` : '';
+      lines.push(`・${i.name}${amt ? ' ' + amt : ''}`);
+    });
+    if (optional.length > 0) {
+      lines.push('（お好みで）');
+      optional.forEach(i => {
+        const amt = i.amount !== '' && i.amount != null ? `${i.amount}${i.unit || ''}` : '';
+        lines.push(`・${i.name}${amt ? ' ' + amt : ''}`);
+      });
+    }
+    lines.push('');
+  }
+  if ((recipe.steps || []).length > 0) {
+    lines.push('▼作り方');
+    recipe.steps.forEach((s, i) => lines.push(`${i + 1}. ${s}`));
+    lines.push('');
+  }
+  if (recipe.notes) {
+    lines.push('▼メモ');
+    lines.push(recipe.notes);
+  }
+  return lines.join('\n');
+}
+async function shareOrCopyText(title, text) {
+  if (navigator.share) {
+    try { await navigator.share({ title, text }); return 'shared'; }
+    catch (e) { if (e.name === 'AbortError') return 'cancelled'; }
+  }
+  const ok = await copyToClipboard(text);
+  return ok ? 'copied' : 'failed';
+}
+function generateGroupCode() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 10; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code.slice(0, 4) + '-' + code.slice(4, 7) + '-' + code.slice(7);
+}
+function normalizeGroupCode(s) {
+  return (s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+}
+function formatGroupCode(raw) {
+  const s = normalizeGroupCode(raw);
+  if (s.length < 5) return s;
+  if (s.length < 8) return s.slice(0, 4) + '-' + s.slice(4);
+  return s.slice(0, 4) + '-' + s.slice(4, 7) + '-' + s.slice(7);
+}
+async function copyToClipboard(text) {
+  try {
+    if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true; }
+  } catch {}
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta); return true;
+  } catch { return false; }
+}
+
+// ========== Firebase 初期化 ==========
+let db = null, auth = null;
+function isConfigValid() {
+  const c = window.FIREBASE_CONFIG;
+  return c && c.apiKey && !String(c.apiKey).includes('PASTE') && c.projectId;
+}
+function initFirebase() {
+  if (!isConfigValid()) return false;
+  if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
+  db = firebase.firestore();
+  auth = firebase.auth();
+  db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+  return true;
+}
+function groupRef(gc, coll) { return db.collection('groups').doc(gc).collection(coll); }
+function groupDoc(gc, coll, id) { return groupRef(gc, coll).doc(id); }
+
+function useCollection(groupCode, name) {
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    if (!groupCode || !db) return;
+    const unsub = groupRef(groupCode, name).onSnapshot(
+      snap => {
+        const arr = [];
+        snap.forEach(doc => arr.push({ id: doc.id, ...doc.data() }));
+        setItems(arr);
+      },
+      err => console.error(`useCollection ${name}:`, err)
+    );
+    return unsub;
+  }, [groupCode, name]);
+  return items;
+}
+
+// ========== オンボーディング ==========
+function Onboarding({ onEnter }) {
+  const [mode, setMode] = useState(null);
+  const [inputCode, setInputCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const createGroup = async () => {
+    setBusy(true); setErrorMsg('');
+    try {
+      const code = generateGroupCode();
+      await db.doc(`groups/${code}`).set({ createdAt: Date.now(), createdBy: auth.currentUser?.uid || null });
+      onEnter(code);
+    } catch (e) { setErrorMsg('作成に失敗：' + (e.message || '')); }
+    finally { setBusy(false); }
+  };
+
+  const joinGroup = async () => {
+    const code = formatGroupCode(inputCode);
+    if (normalizeGroupCode(code).length !== 10) { setErrorMsg('コードは10文字です（例: ABCD-EFG-HJK）'); return; }
+    setBusy(true); setErrorMsg('');
+    try {
+      const snap = await db.doc(`groups/${code}`).get();
+      if (!snap.exists) { setErrorMsg('そのコードのグループは見つかりませんでした'); setBusy(false); return; }
+      onEnter(code);
+    } catch (e) { setErrorMsg('参加に失敗：' + (e.message || '')); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh', background: colors.bg, fontFamily: fontStack, color: colors.ink,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      padding: 24, maxWidth: 640, margin: '0 auto',
+    }}>
+      <div style={{
+        width: 72, height: 72, borderRadius: 20, background: colors.accent,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24,
+      }}>
+        <BookOpen size={36} color="white" strokeWidth={1.5} />
+      </div>
+      <h1 style={{ fontSize: 26, fontWeight: 700, margin: '0 0 8px 0', textAlign: 'center' }}>レシピ帳</h1>
+      <p style={{ fontSize: 14, color: colors.muted, textAlign: 'center', margin: '0 0 32px 0', lineHeight: 1.6 }}>
+        レシピ・作り置き・買い物リストを家族と共有して自動同期
+      </p>
+
+      {mode === null && (
+        <div style={{ width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <button onClick={() => setMode('create')}
+            style={{ background: colors.accent, color: 'white', border: 'none', borderRadius: 12, padding: 14, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            新しくグループを作る
+          </button>
+          <button onClick={() => setMode('join')}
+            style={{ background: colors.card, color: colors.ink, border: `1px solid ${colors.line}`, borderRadius: 12, padding: 14, fontSize: 15, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+            招待コードで参加する
+          </button>
+        </div>
+      )}
+
+      {mode === 'create' && (
+        <div style={{ width: '100%', maxWidth: 340 }}>
+          <div style={{ background: colors.accentSoft, borderRadius: 12, padding: 14, marginBottom: 16, fontSize: 13, color: colors.ink, lineHeight: 1.6 }}>
+            グループを作ると招待コードが発行されます。家族にコードを伝えて参加してもらってください。
+          </div>
+          {errorMsg && <ErrorNote text={errorMsg} />}
+          <button onClick={createGroup} disabled={busy}
+            style={{ width: '100%', background: colors.accent, color: 'white', border: 'none', borderRadius: 12, padding: 14, fontSize: 15, fontWeight: 600, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1, fontFamily: 'inherit', marginBottom: 10 }}>
+            {busy ? '作成中…' : 'グループを作成'}
+          </button>
+          <button onClick={() => { setMode(null); setErrorMsg(''); }}
+            style={{ width: '100%', background: 'none', border: 'none', color: colors.muted, cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, padding: 8 }}>戻る</button>
+        </div>
+      )}
+
+      {mode === 'join' && (
+        <div style={{ width: '100%', maxWidth: 340 }}>
+          <div style={{ fontSize: 13, color: colors.muted, marginBottom: 8 }}>招待コード</div>
+          <input type="text" value={inputCode}
+            onChange={(e) => setInputCode(formatGroupCode(e.target.value))}
+            onKeyDown={(e) => { if (e.key === 'Enter') joinGroup(); }}
+            placeholder="ABCD-EFG-HJK" autoCapitalize="characters"
+            style={{ width: '100%', padding: 14, border: `1px solid ${colors.line}`, borderRadius: 12, background: colors.card, fontSize: 18, color: colors.ink, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', textAlign: 'center', letterSpacing: '0.1em', fontWeight: 600, marginBottom: 12 }} />
+          {errorMsg && <ErrorNote text={errorMsg} />}
+          <button onClick={joinGroup} disabled={busy}
+            style={{ width: '100%', background: colors.accent, color: 'white', border: 'none', borderRadius: 12, padding: 14, fontSize: 15, fontWeight: 600, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1, fontFamily: 'inherit', marginBottom: 10 }}>
+            {busy ? '参加中…' : '参加する'}
+          </button>
+          <button onClick={() => { setMode(null); setErrorMsg(''); }}
+            style={{ width: '100%', background: 'none', border: 'none', color: colors.muted, cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, padding: 8 }}>戻る</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ErrorNote({ text }) {
+  return (
+    <div style={{ background: '#FDECEC', color: colors.danger, borderRadius: 10, padding: '10px 12px', fontSize: 13, marginBottom: 12, lineHeight: 1.5 }}>{text}</div>
+  );
+}
+
+// ========== エントリーポイント ==========
+function App() {
+  const [phase, setPhase] = useState('checking');
+  const [groupCode, setGroupCode] = useState(null);
+
+  useEffect(() => {
+    if (!isConfigValid()) { setPhase('badConfig'); return; }
+    if (!initFirebase()) { setPhase('badConfig'); return; }
+    setPhase('authWait');
+    const unsub = auth.onAuthStateChanged((user) => {
+      if (user) {
+        const saved = localStorage.getItem(GROUP_CODE_KEY);
+        setGroupCode(saved || null);
+        setPhase('ready');
+      }
+    });
+    auth.signInAnonymously().catch((e) => {
+      alert('認証エラー：Firebaseで匿名認証が有効になっているか確認してください。\n' + (e.message || ''));
+    });
+    return unsub;
+  }, []);
+
+  const handleEnter = (code) => { localStorage.setItem(GROUP_CODE_KEY, code); setGroupCode(code); };
+  const handleLeave = () => { localStorage.removeItem(GROUP_CODE_KEY); setGroupCode(null); };
+
+  if (phase === 'badConfig') return <ConfigErrorScreen />;
+  if (phase !== 'ready') return <LoadingScreen />;
+  if (!groupCode) return <Onboarding onEnter={handleEnter} />;
+  return <RecipeApp groupCode={groupCode} onLeaveGroup={handleLeave} />;
+}
+
+function LoadingScreen() {
+  return (
+    <div style={{ minHeight: '100vh', background: colors.bg, fontFamily: fontStack, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.muted }}>読み込み中…</div>
+  );
+}
+
+function ConfigErrorScreen() {
+  return (
+    <div style={{ minHeight: '100vh', background: colors.bg, fontFamily: fontStack, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ maxWidth: 400, textAlign: 'center' }}>
+        <div style={{ fontSize: 44, marginBottom: 12 }}>⚙️</div>
+        <h1 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 12px 0' }}>Firebase設定が必要です</h1>
+        <p style={{ fontSize: 14, color: colors.muted, lineHeight: 1.7 }}>
+          <code>index.html</code>内の <code>FIREBASE_CONFIG</code>に、あなたのFirebaseプロジェクトの設定を貼り付けてください。<br /><br />
+          手順は<code>README.md</code>をご覧ください。
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ========== メインアプリ ==========
+function RecipeApp({ groupCode, onLeaveGroup }) {
+  const [view, setView] = useState('list');
+  const recipesRaw = useCollection(groupCode, 'recipes');
+  const shopping = useCollection(groupCode, 'shopping');
+  const mealPreps = useCollection(groupCode, 'mealPreps');
+  const [selectedId, setSelectedId] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [tab, setTab] = useState('recipes');
+  const [openMealPrep, setOpenMealPrep] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
+
+  const recipes = [...recipesRaw].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+  const showToast = (message, undo) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, undo, id: Date.now() });
+    toastTimerRef.current = setTimeout(() => setToast(null), 5000);
+  };
+  const dismissToast = () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(null);
+  };
+
+  useEffect(() => {
+    const id = 'recipe-app-font';
+    if (document.getElementById(id)) return;
+    const link = document.createElement('link');
+    link.id = id; link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;600;700&display=swap';
+    document.head.appendChild(link);
+  }, []);
+
+  useEffect(() => {
+    const cleanup = async () => {
+      const now = Date.now();
+      const expired = shopping.filter(s => s.deletedAt && (now - s.deletedAt) >= TRASH_TTL);
+      if (expired.length === 0) return;
+      try {
+        const batch = db.batch();
+        expired.forEach(s => batch.delete(groupDoc(groupCode, 'shopping', s.id)));
+        await batch.commit();
+      } catch (e) { console.error('trash cleanup:', e); }
+    };
+    cleanup();
+    const timer = setInterval(cleanup, 60 * 1000);
+    return () => clearInterval(timer);
+  }, [shopping, groupCode]);
+
+  const selected = recipes.find(r => r.id === selectedId);
+  const allTags = Array.from(new Set(recipes.flatMap(r => r.tags || []))).sort();
+  const allAuthors = Array.from(new Set(recipes.map(r => r.author).filter(Boolean))).sort();
+  const allIngredients = Array.from(new Set(
+    recipes.flatMap(r => (r.ingredients || []).map(i => (i.name || '').trim()).filter(Boolean))
+  )).sort();
+
+  const filtered = applyFilters(recipes, filters);
+  const displayed = sortRecipes(filtered, filters.sortBy);
+
+  const openNew = () => {
+    setEditing({
+      id: null, title: '', photo: null, baseServings: '', cookTime: '',
+      favorite: false, tags: [], author: '',
+      ingredients: [{ name: '', amount: '', unit: '' }], steps: [''], notes: '',
+    });
+    setView('edit');
+  };
+  const openEdit = (recipe) => { setEditing(JSON.parse(JSON.stringify(recipe))); setView('edit'); };
+  const saveRecipe = async (recipe) => {
+    const cleaned = {
+      ...recipe,
+      title: recipe.title.trim() || '無題のレシピ',
+      author: (recipe.author || '').trim(),
+      ingredients: recipe.ingredients.filter(i => i.name.trim()),
+      steps: recipe.steps.filter(s => s.trim()),
+      tags: recipe.tags.filter(t => t.trim()),
+    };
+    try {
+      let id = recipe.id;
+      if (!id) {
+        id = 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+        cleaned.createdAt = Date.now();
+        cleaned.cookCount = 0;
+        cleaned.cookHistory = [];
+        cleaned.lastCookedAt = null;
+      }
+      cleaned.id = id;
+      await groupDoc(groupCode, 'recipes', id).set(cleaned);
+      setSelectedId(id); setView('detail');
+    } catch (e) { alert('保存に失敗：' + (e.message || '')); }
+  };
+  const deleteRecipe = async (id) => {
+    try { await groupDoc(groupCode, 'recipes', id).delete(); setView('list'); setSelectedId(null); }
+    catch (e) { alert('削除に失敗：' + (e.message || '')); }
+  };
+  const toggleFavorite = async (id) => {
+    const r = recipes.find(x => x.id === id);
+    if (!r) return;
+    try { await groupDoc(groupCode, 'recipes', id).update({ favorite: !r.favorite }); } catch (e) { console.error(e); }
+  };
+  const duplicateRecipe = async (recipe) => {
+    const copy = {
+      ...JSON.parse(JSON.stringify(recipe)),
+      id: 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      title: recipe.title + '（コピー）', favorite: false, createdAt: Date.now(),
+      cookCount: 0, cookHistory: [], lastCookedAt: null,
+    };
+    try { await groupDoc(groupCode, 'recipes', copy.id).set(copy); setSelectedId(copy.id); setView('detail'); }
+    catch (e) { alert('複製に失敗：' + (e.message || '')); }
+  };
+
+  // 調理回数
+  const markCooked = async (id) => {
+    const r = recipes.find(x => x.id === id);
+    if (!r) return;
+    const now = Date.now();
+    const newHistory = [...(r.cookHistory || []), now];
+    const newCount = (r.cookCount || 0) + 1;
+    try {
+      await groupDoc(groupCode, 'recipes', id).update({
+        cookCount: newCount, cookHistory: newHistory, lastCookedAt: now,
+      });
+      showToast(`「${r.title}」を作りました（計${newCount}回）`, () => unmarkLastCooked(id, now));
+    } catch (e) { console.error(e); }
+  };
+  const unmarkLastCooked = async (id, timestampToRemove) => {
+    const r = recipes.find(x => x.id === id);
+    if (!r) return;
+    const history = r.cookHistory || [];
+    // 最後のエントリー、または特定のタイムスタンプを削除
+    let newHistory = history;
+    if (timestampToRemove) {
+      const idx = history.lastIndexOf(timestampToRemove);
+      if (idx !== -1) newHistory = [...history.slice(0, idx), ...history.slice(idx + 1)];
+    } else {
+      newHistory = history.slice(0, -1);
+    }
+    const newCount = Math.max(0, (r.cookCount || 0) - 1);
+    const newLastCooked = newHistory.length > 0 ? newHistory[newHistory.length - 1] : null;
+    try {
+      await groupDoc(groupCode, 'recipes', id).update({
+        cookCount: newCount, cookHistory: newHistory, lastCookedAt: newLastCooked,
+      });
+    } catch (e) { console.error(e); }
+  };
+  const adjustCookCount = async (id, delta) => {
+    const r = recipes.find(x => x.id === id);
+    if (!r) return;
+    const cur = r.cookCount || 0;
+    const next = Math.max(0, cur + delta);
+    if (next === cur) return;
+    if (delta > 0) {
+      // 履歴も進める
+      const now = Date.now();
+      const newHistory = [...(r.cookHistory || []), now];
+      try {
+        await groupDoc(groupCode, 'recipes', id).update({
+          cookCount: next, cookHistory: newHistory, lastCookedAt: now,
+        });
+      } catch (e) { console.error(e); }
+    } else {
+      // 履歴の最後を消す
+      const history = r.cookHistory || [];
+      const newHistory = history.slice(0, -1);
+      const newLastCooked = newHistory.length > 0 ? newHistory[newHistory.length - 1] : null;
+      try {
+        await groupDoc(groupCode, 'recipes', id).update({
+          cookCount: next, cookHistory: newHistory, lastCookedAt: newLastCooked,
+        });
+      } catch (e) { console.error(e); }
+    }
+  };
+
+  // レシピ共有
+  const shareRecipe = async (recipe) => {
+    const text = formatRecipeAsText(recipe);
+    const result = await shareOrCopyText(recipe.title, text);
+    if (result === 'copied') showToast('レシピをコピーしました');
+    else if (result === 'failed') alert('共有に失敗しました');
+  };
+
+  const addToShopping = async (items) => {
+    try {
+      const batch = db.batch();
+      const now = Date.now();
+      items.forEach((i, idx) => {
+        const id = 's_' + now + '_' + idx + '_' + Math.random().toString(36).slice(2, 7);
+        batch.set(groupDoc(groupCode, 'shopping', id), {
+          id, name: i.name,
+          quantity: typeof i.amount === 'number' ? i.amount : (parseFloat(i.amount) || 1),
+          unit: i.unit || '', checked: false, deletedAt: null, createdAt: now,
+        });
+      });
+      await batch.commit();
+    } catch (e) { alert('追加に失敗：' + (e.message || '')); }
+  };
+  const updateShoppingItem = async (id, patch) => {
+    try { await groupDoc(groupCode, 'shopping', id).update(patch); } catch (e) { console.error(e); }
+  };
+  const moveShoppingToTrash = (id) => updateShoppingItem(id, { deletedAt: Date.now() });
+  const restoreShoppingItem = (id) => updateShoppingItem(id, { deletedAt: null });
+  const permanentDeleteShoppingItem = async (id) => {
+    try { await groupDoc(groupCode, 'shopping', id).delete(); } catch (e) { console.error(e); }
+  };
+  const moveCheckedToTrash = async () => {
+    const targets = shopping.filter(s => s.checked && !s.deletedAt);
+    if (targets.length === 0) return;
+    try {
+      const now = Date.now();
+      const batch = db.batch();
+      targets.forEach(s => batch.update(groupDoc(groupCode, 'shopping', s.id), { deletedAt: now }));
+      await batch.commit();
+    } catch (e) { console.error(e); }
+  };
+  const emptyTrash = async () => {
+    const targets = shopping.filter(s => s.deletedAt);
+    if (targets.length === 0) return;
+    try {
+      const batch = db.batch();
+      targets.forEach(s => batch.delete(groupDoc(groupCode, 'shopping', s.id)));
+      await batch.commit();
+    } catch (e) { console.error(e); }
+  };
+
+  const addMealPrep = async ({ name, recipeId = null, photo = null, madeDate = Date.now(), remaining = '', note = '' }) => {
+    const id = 'mp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    const item = { id, name, recipeId, photo, madeDate, remaining, note, createdAt: Date.now() };
+    try { await groupDoc(groupCode, 'mealPreps', id).set(item); return item; }
+    catch (e) { alert('追加に失敗：' + (e.message || '')); }
+  };
+  const addMealPrepFromRecipe = async (recipe) => addMealPrep({
+    name: recipe.title, recipeId: recipe.id, photo: recipe.photo,
+    remaining: hasServings(recipe) ? `${recipe.baseServings}人分` : '',
+    madeDate: Date.now(),
+  });
+  const updateMealPrep = async (id, patch) => {
+    try { await groupDoc(groupCode, 'mealPreps', id).update(patch); } catch (e) { console.error(e); }
+  };
+  const removeMealPrep = async (id) => {
+    try { await groupDoc(groupCode, 'mealPreps', id).delete(); setOpenMealPrep(null); }
+    catch (e) { console.error(e); }
+  };
+
+  const exportData = () => {
+    const data = { version: 1, exportedAt: new Date().toISOString(), groupCode, recipes, shopping, mealPreps };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `recipe-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const importData = async (file, mode) => {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data || typeof data !== 'object') throw new Error('形式が正しくありません');
+      const impRecipes = Array.isArray(data.recipes) ? data.recipes : [];
+      const impShopping = Array.isArray(data.shopping) ? data.shopping : [];
+      const impMealPreps = Array.isArray(data.mealPreps) ? data.mealPreps : [];
+
+      const chunk = (arr, size) => {
+        const chunks = [];
+        for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+        return chunks;
+      };
+
+      if (mode === 'replace') {
+        const allDeletes = [
+          ...recipes.map(r => groupDoc(groupCode, 'recipes', r.id)),
+          ...shopping.map(s => groupDoc(groupCode, 'shopping', s.id)),
+          ...mealPreps.map(m => groupDoc(groupCode, 'mealPreps', m.id)),
+        ];
+        for (const c of chunk(allDeletes, 400)) {
+          const b = db.batch();
+          c.forEach(ref => b.delete(ref));
+          await b.commit();
+        }
+      }
+
+      const existingR = new Set(mode === 'merge' ? recipes.map(r => r.id) : []);
+      const existingS = new Set(mode === 'merge' ? shopping.map(s => s.id) : []);
+      const existingM = new Set(mode === 'merge' ? mealPreps.map(m => m.id) : []);
+
+      const toAddR = impRecipes.filter(r => r.id && !existingR.has(r.id));
+      const toAddS = impShopping.filter(s => s.id && !existingS.has(s.id));
+      const toAddM = impMealPreps.filter(m => m.id && !existingM.has(m.id));
+
+      const allWrites = [
+        ...toAddR.map(r => ({ ref: groupDoc(groupCode, 'recipes', r.id), data: r })),
+        ...toAddS.map(s => ({ ref: groupDoc(groupCode, 'shopping', s.id), data: s })),
+        ...toAddM.map(m => ({ ref: groupDoc(groupCode, 'mealPreps', m.id), data: m })),
+      ];
+      for (const c of chunk(allWrites, 400)) {
+        const b = db.batch();
+        c.forEach(w => b.set(w.ref, w.data));
+        await b.commit();
+      }
+
+      alert((mode === 'replace' ? '復元完了' : '追加完了') +
+        `：レシピ${toAddR.length}件 / 作り置き${toAddM.length}件 / 買い物${toAddS.length}件`);
+    } catch (e) {
+      alert('失敗：' + (e.message || ''));
+    }
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', background: colors.bg, color: colors.ink, fontFamily: fontStack, paddingBottom: 80, maxWidth: 640, margin: '0 auto' }}>
+      {tab === 'recipes' && view === 'list' && (
+        <ListView recipes={displayed} totalRecipes={recipes.length}
+          filters={filters} setFilters={setFilters}
+          onOpenFilter={() => setFilterOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onOpen={(r) => { setSelectedId(r.id); setView('detail'); }}
+          onNew={openNew} />
+      )}
+      {tab === 'recipes' && view === 'detail' && selected && (
+        <DetailView recipe={selected}
+          onBack={() => setView('list')} onEdit={() => openEdit(selected)}
+          onDelete={() => deleteRecipe(selected.id)}
+          onToggleFavorite={() => toggleFavorite(selected.id)}
+          onDuplicate={() => duplicateRecipe(selected)}
+          onAddToShopping={addToShopping}
+          onAddToMealPrep={async () => { await addMealPrepFromRecipe(selected); showToast('作り置きリストに追加しました'); }}
+          onMarkCooked={() => markCooked(selected.id)}
+          onAdjustCookCount={(delta) => adjustCookCount(selected.id, delta)}
+          onShare={() => shareRecipe(selected)} />
+      )}
+      {tab === 'recipes' && view === 'edit' && editing && (
+        <EditView initial={editing} allTags={allTags} allAuthors={allAuthors}
+          onCancel={() => setView(editing.id ? 'detail' : 'list')} onSave={saveRecipe} />
+      )}
+      {tab === 'shopping' && (
+        <ShoppingView items={shopping}
+          onUpdate={updateShoppingItem} onMoveToTrash={moveShoppingToTrash}
+          onRestore={restoreShoppingItem} onPermanentDelete={permanentDeleteShoppingItem}
+          onMoveCheckedToTrash={moveCheckedToTrash} onEmptyTrash={emptyTrash}
+          onAdd={(name) => addToShopping([{ name, amount: 1, unit: '' }])} />
+      )}
+      {tab === 'mealprep' && (
+        <MealPrepView items={mealPreps} recipes={recipes}
+          onAdd={addMealPrep} onOpen={(item) => setOpenMealPrep(item)} />
+      )}
+      {tab === 'ranking' && (
+        <RankingView recipes={recipes}
+          onOpenRecipe={(id) => { setSelectedId(id); setTab('recipes'); setView('detail'); }} />
+      )}
+
+      {filterOpen && (
+        <FilterModal filters={filters} setFilters={setFilters}
+          allTags={allTags} allIngredients={allIngredients} allAuthors={allAuthors}
+          resultCount={displayed.length} onClose={() => setFilterOpen(false)} />
+      )}
+
+      {settingsOpen && (
+        <SettingsModal onClose={() => setSettingsOpen(false)}
+          onExport={exportData} onImport={(f) => importData(f, 'replace')}
+          onMerge={(f) => importData(f, 'merge')} onLeaveGroup={onLeaveGroup}
+          groupCode={groupCode}
+          stats={{ recipes: recipes.length, mealPreps: mealPreps.length, shopping: shopping.length }} />
+      )}
+
+      {openMealPrep && (
+        <MealPrepDetailModal key={openMealPrep.id} item={openMealPrep}
+          onClose={() => setOpenMealPrep(null)}
+          onUpdate={updateMealPrep} onRemove={removeMealPrep}
+          onOpenRecipe={(recipeId) => {
+            setOpenMealPrep(null); setSelectedId(recipeId); setTab('recipes'); setView('detail');
+          }} />
+      )}
+
+      {toast && <Toast toast={toast} onDismiss={dismissToast} />}
+
+      <BottomNav tab={tab}
+        onChange={(t) => { setTab(t); if (t === 'recipes') setView('list'); }}
+        shoppingCount={shopping.filter(s => !s.checked && !s.deletedAt).length}
+        mealPrepCount={mealPreps.length} />
+    </div>
+  );
+}
+// ---------- 一覧 ----------
+function ListView({ recipes, totalRecipes, filters, setFilters, onOpenFilter, onOpenSettings, onOpen, onNew }) {
+  const activeCount = countActiveFilters(filters);
+  const chips = buildActiveChips(filters, setFilters);
+  const isFiltered = activeCount > 0 || filters.query.trim() !== '';
+  const currentSort = SORT_OPTIONS.find(o => o.value === filters.sortBy) || SORT_OPTIONS[0];
+
+  return (
+    <div style={{ padding: '20px 16px 24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>レシピ</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <span style={{ fontSize: 13, color: colors.muted }}>
+            {isFiltered ? `${recipes.length} / ${totalRecipes}` : `${totalRecipes}件`}
+          </span>
+          <button onClick={onOpenSettings} aria-label="設定"
+            style={{ background: 'none', border: 'none', color: colors.muted, cursor: 'pointer', padding: 4, display: 'flex' }}>
+            <Settings size={20} strokeWidth={1.8} />
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: colors.muted }} />
+          <input type="text" value={filters.query} onChange={(e) => setFilters({ ...filters, query: e.target.value })}
+            placeholder="料理名・材料・メモなどで検索"
+            style={{
+              width: '100%', padding: '10px 12px 10px 36px', border: `1px solid ${colors.line}`,
+              borderRadius: 14, background: colors.card, fontSize: 15, color: colors.ink,
+              outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
+            }}
+          />
+          {filters.query && (
+            <button onClick={() => setFilters({ ...filters, query: '' })} aria-label="検索クリア"
+              style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: colors.muted, cursor: 'pointer', padding: 4, display: 'flex' }}>
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        <button onClick={onOpenFilter} aria-label="絞り込み"
+          style={{
+            position: 'relative', width: 44, borderRadius: 14, border: `1px solid ${activeCount > 0 ? colors.accent : colors.line}`,
+            background: activeCount > 0 ? colors.accentSoft : colors.card,
+            color: activeCount > 0 ? colors.accent : colors.ink,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+          <SlidersHorizontal size={18} strokeWidth={2} />
+          {activeCount > 0 && (
+            <span style={{
+              position: 'absolute', top: -4, right: -4, background: colors.accent, color: 'white',
+              fontSize: 10, fontWeight: 600, minWidth: 16, height: 16, borderRadius: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px',
+            }}>{activeCount}</span>
+          )}
+        </button>
+      </div>
+
+      {chips.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+          {chips.map((c, i) => (
+            <button key={i} onClick={c.clear}
+              style={{
+                fontSize: 12, color: colors.accent, background: colors.accentSoft,
+                border: 'none', padding: '4px 8px 4px 12px', borderRadius: 999,
+                display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              {c.label}
+              <X size={12} strokeWidth={2.5} />
+            </button>
+          ))}
+          <button onClick={() => setFilters({ ...DEFAULT_FILTERS, query: filters.query })}
+            style={{ fontSize: 12, color: colors.muted, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' }}>
+            すべてクリア
+          </button>
+        </div>
+      )}
+
+      {recipes.length === 0 ? (
+        <EmptyState
+          title={isFiltered ? '該当するレシピがありません' : 'まだレシピがありません'}
+          hint={isFiltered ? '絞り込み条件を変えてみましょう' : '右下の＋ボタンから追加しましょう'}
+        />
+      ) : (
+        <>
+          {filters.sortBy !== 'newest' && (
+            <div style={{ fontSize: 12, color: colors.muted, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <ArrowUpDown size={12} strokeWidth={2} /> {currentSort.label}
+            </div>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {recipes.map(r => <RecipeCard key={r.id} recipe={r} onClick={() => onOpen(r)} />)}
+          </div>
+        </>
+      )}
+
+      <button onClick={onNew} aria-label="新しいレシピを追加"
+        style={{
+          position: 'fixed', bottom: 96, right: 20, width: 56, height: 56, borderRadius: 28,
+          background: colors.accent, color: 'white', border: 'none', boxShadow: '0 4px 14px rgba(91,124,93,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+        }}>
+        <Plus size={24} />
+      </button>
+    </div>
+  );
+}
+
+function buildActiveChips(filters, setFilters) {
+  const chips = [];
+  if (filters.favOnly) {
+    chips.push({ label: '♡ お気に入り', clear: () => setFilters({ ...filters, favOnly: false }) });
+  }
+  filters.tags.forEach(t => {
+    chips.push({ label: `#${t}`, clear: () => setFilters({ ...filters, tags: filters.tags.filter(x => x !== t) }) });
+  });
+  filters.ingredients.forEach(ing => {
+    chips.push({ label: `材料: ${ing}`, clear: () => setFilters({ ...filters, ingredients: filters.ingredients.filter(x => x !== ing) }) });
+  });
+  filters.authors.forEach(a => {
+    chips.push({ label: `登録: ${a}`, clear: () => setFilters({ ...filters, authors: filters.authors.filter(x => x !== a) }) });
+  });
+  if (filters.servingsMin !== '' || filters.servingsMax !== '') {
+    const min = filters.servingsMin === '' ? '' : filters.servingsMin;
+    const max = filters.servingsMax === '' ? '' : filters.servingsMax;
+    let label = '';
+    if (min !== '' && max !== '') label = `${min}〜${max}人分`;
+    else if (min !== '') label = `${min}人分以上`;
+    else label = `${max}人分以下`;
+    chips.push({ label, clear: () => setFilters({ ...filters, servingsMin: '', servingsMax: '' }) });
+  }
+  if (filters.cookTimeMax !== '') {
+    chips.push({
+      label: `${filters.cookTimeMax}分以内`,
+      clear: () => setFilters({ ...filters, cookTimeMax: '' }),
+    });
+  }
+  return chips;
+}
+
+function RecipeCard({ recipe, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 14,
+      padding: 0, overflow: 'hidden', textAlign: 'left', cursor: 'pointer', width: '100%',
+      fontFamily: 'inherit', position: 'relative',
+    }}>
+      <div style={{ position: 'relative' }}>
+        {recipe.photo ? (
+          <div style={{ aspectRatio: '1', backgroundImage: `url(${recipe.photo})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+        ) : (
+          <div style={{ aspectRatio: '1', background: colors.accentSoft, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <BookOpen size={28} color={colors.accent} strokeWidth={1.5} />
+          </div>
+        )}
+        {recipe.favorite && (
+          <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(255,255,255,0.9)', borderRadius: 999, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Heart size={13} fill={colors.favorite} color={colors.favorite} strokeWidth={2} />
+          </div>
+        )}
+      </div>
+      <div style={{ padding: '10px 12px' }}>
+        <div style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.35, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+          {recipe.title}
+        </div>
+        <div style={{ fontSize: 11, color: colors.muted, marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {recipe.cookTime && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              <Clock size={11} strokeWidth={2} /> {recipe.cookTime}分
+            </span>
+          )}
+          {(recipe.cookCount || 0) > 0 && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: colors.accent }}>
+              <CheckCircle size={11} strokeWidth={2} /> {recipe.cookCount}回
+            </span>
+          )}
+          {recipe.author && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <User size={11} strokeWidth={2} /> {recipe.author}
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function EmptyState({ title, hint }) {
+  return (
+    <div style={{ textAlign: 'center', padding: '60px 20px', color: colors.muted }}>
+      <div style={{ fontSize: 15, marginBottom: 6, color: colors.ink }}>{title}</div>
+      <div style={{ fontSize: 13 }}>{hint}</div>
+    </div>
+  );
+}
+
+// ---------- 絞り込みモーダル ----------
+function FilterModal({ filters, setFilters, allTags, allIngredients, allAuthors, resultCount, onClose }) {
+  const [ingSearch, setIngSearch] = useState('');
+
+  const toggleInArray = (key, val) => {
+    const arr = filters[key];
+    const next = arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val];
+    setFilters({ ...filters, [key]: next });
+  };
+
+  const setNumField = (key, val) => {
+    if (val === '') { setFilters({ ...filters, [key]: '' }); return; }
+    const n = parseInt(val);
+    setFilters({ ...filters, [key]: isNaN(n) ? '' : Math.max(1, n) });
+  };
+
+  const reset = () => setFilters(DEFAULT_FILTERS);
+
+  const filteredIngs = ingSearch.trim()
+    ? allIngredients.filter(i => i.toLowerCase().includes(ingSearch.trim().toLowerCase()))
+    : allIngredients;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100,
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center', fontFamily: fontStack,
+    }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: colors.bg, borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 640,
+        maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderBottom: `1px solid ${colors.line}` }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: colors.muted, cursor: 'pointer', padding: 4, display: 'flex' }}>
+            <X size={22} />
+          </button>
+          <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>絞り込み</h2>
+          <button onClick={reset} style={{ background: 'none', border: 'none', color: colors.accent, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>
+            リセット
+          </button>
+        </div>
+
+        <div style={{ overflowY: 'auto', padding: '16px', flex: 1 }}>
+          <FilterSection label="並び順">
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {SORT_OPTIONS.map(opt => (
+                <button key={opt.value} onClick={() => setFilters({ ...filters, sortBy: opt.value })}
+                  style={{
+                    padding: '6px 14px', borderRadius: 999, fontSize: 13, whiteSpace: 'nowrap',
+                    border: `1px solid ${filters.sortBy === opt.value ? colors.accent : colors.line}`,
+                    background: filters.sortBy === opt.value ? colors.accent : colors.card,
+                    color: filters.sortBy === opt.value ? 'white' : colors.ink,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}>{opt.label}</button>
+              ))}
+            </div>
+          </FilterSection>
+
+          {/* お気に入り */}
+          <FilterSection label="お気に入り">
+            <button onClick={() => setFilters({ ...filters, favOnly: !filters.favOnly })}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, background: filters.favOnly ? colors.favorite : colors.card,
+                color: filters.favOnly ? 'white' : colors.ink,
+                border: `1px solid ${filters.favOnly ? colors.favorite : colors.line}`,
+                borderRadius: 999, padding: '8px 14px', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              <Heart size={14} fill={filters.favOnly ? 'white' : 'none'} strokeWidth={2} />
+              お気に入りのみ
+            </button>
+          </FilterSection>
+
+          {/* 人数 */}
+          <FilterSection label="人数（人分）">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="number" min="1" value={filters.servingsMin} placeholder="最小"
+                onChange={(e) => setNumField('servingsMin', e.target.value)}
+                style={{ ...inputStyle, width: 90 }} />
+              <span style={{ color: colors.muted, fontSize: 14 }}>〜</span>
+              <input type="number" min="1" value={filters.servingsMax} placeholder="最大"
+                onChange={(e) => setNumField('servingsMax', e.target.value)}
+                style={{ ...inputStyle, width: 90 }} />
+              <span style={{ color: colors.muted, fontSize: 13 }}>人分</span>
+            </div>
+          </FilterSection>
+
+          {/* 調理時間 */}
+          <FilterSection label="調理時間（以内）">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="number" min="1" value={filters.cookTimeMax} placeholder="例: 30"
+                onChange={(e) => setNumField('cookTimeMax', e.target.value)}
+                style={{ ...inputStyle, width: 100 }} />
+              <span style={{ color: colors.muted, fontSize: 13 }}>分以内</span>
+            </div>
+            <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {[15, 30, 60].map(preset => (
+                <button key={preset} onClick={() => setFilters({ ...filters, cookTimeMax: preset })}
+                  style={{
+                    fontSize: 12, color: filters.cookTimeMax === preset ? colors.accent : colors.muted,
+                    background: filters.cookTimeMax === preset ? colors.accentSoft : colors.card,
+                    border: `1px solid ${filters.cookTimeMax === preset ? colors.accent : colors.line}`,
+                    borderRadius: 999, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit',
+                  }}>{preset}分以内</button>
+              ))}
+            </div>
+          </FilterSection>
+
+          {/* タグ */}
+          {allTags.length > 0 && (
+            <FilterSection label={`タグ${filters.tags.length ? `（${filters.tags.length}件選択中）` : ''}`}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {allTags.map(t => (
+                  <FilterChip key={t} label={t} active={filters.tags.includes(t)} onClick={() => toggleInArray('tags', t)} />
+                ))}
+              </div>
+            </FilterSection>
+          )}
+
+          {/* 材料 */}
+          {allIngredients.length > 0 && (
+            <FilterSection label={`材料${filters.ingredients.length ? `（${filters.ingredients.length}件選択中）` : ''}`}>
+              {allIngredients.length > 8 && (
+                <input type="text" value={ingSearch} onChange={(e) => setIngSearch(e.target.value)}
+                  placeholder="材料名で絞り込む"
+                  style={{ ...inputStyle, width: '100%', marginBottom: 8 }} />
+              )}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxHeight: 240, overflowY: 'auto' }}>
+                {filteredIngs.map(ing => (
+                  <FilterChip key={ing} label={ing} active={filters.ingredients.includes(ing)} onClick={() => toggleInArray('ingredients', ing)} />
+                ))}
+                {filteredIngs.length === 0 && (
+                  <div style={{ fontSize: 12, color: colors.muted, padding: '8px 4px' }}>該当なし</div>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>
+                選んだ材料すべてを含むレシピが表示されます
+              </div>
+            </FilterSection>
+          )}
+
+          {/* 登録者 */}
+          {allAuthors.length > 0 && (
+            <FilterSection label={`登録者${filters.authors.length ? `（${filters.authors.length}件選択中）` : ''}`}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {allAuthors.map(a => (
+                  <FilterChip key={a} label={a} active={filters.authors.includes(a)} onClick={() => toggleInArray('authors', a)} />
+                ))}
+              </div>
+            </FilterSection>
+          )}
+        </div>
+
+        <div style={{
+          padding: '12px 16px calc(12px + env(safe-area-inset-bottom, 0px))',
+          borderTop: `1px solid ${colors.line}`, background: colors.bg,
+        }}>
+          <button onClick={onClose}
+            style={{
+              width: '100%', background: colors.accent, color: 'white', border: 'none', borderRadius: 12,
+              padding: '13px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+            {resultCount}件を表示
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FilterSection({ label, children }) {
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ fontSize: 12, color: colors.muted, marginBottom: 10, fontWeight: 500 }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function FilterChip({ label, active, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      padding: '6px 14px', borderRadius: 999, fontSize: 13, whiteSpace: 'nowrap',
+      border: `1px solid ${active ? colors.accent : colors.line}`,
+      background: active ? colors.accent : colors.card,
+      color: active ? 'white' : colors.ink,
+      cursor: 'pointer', fontFamily: 'inherit',
+    }}>{label}</button>
+  );
+}
+
+// ---------- レシピ詳細 ----------
+function DetailView({ recipe, onBack, onEdit, onDelete, onToggleFavorite, onDuplicate, onAddToShopping, onAddToMealPrep, onMarkCooked, onAdjustCookCount, onShare }) {
+  const hasS = hasServings(recipe);
+  const [servings, setServings] = useState(hasS ? recipe.baseServings : 1);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const ratio = hasS ? servings / recipe.baseServings : 1;
+
+  const cookCount = recipe.cookCount || 0;
+  const lastCookedAt = recipe.lastCookedAt;
+  const required = (recipe.ingredients || []).filter(i => !i.optional);
+  const optional = (recipe.ingredients || []).filter(i => i.optional);
+
+  const buildShoppingItem = (ing) => ({
+    name: ing.name,
+    amount: typeof ing.amount === 'number' ? scaleAmount(ing.amount, ratio) : ing.amount,
+    unit: ing.unit,
+  });
+
+  const handleAddRequired = () => {
+    const items = required.map(buildShoppingItem);
+    if (items.length === 0) return;
+    onAddToShopping(items);
+    alert(`必須の材料 ${items.length} 品を買い物リストに追加しました`);
+  };
+  const handleAddAll = () => {
+    const items = recipe.ingredients.map(buildShoppingItem);
+    if (items.length === 0) return;
+    onAddToShopping(items);
+    alert(`材料 ${items.length} 品を買い物リストに追加しました`);
+  };
+
+  return (
+    <div>
+      <div style={{ position: 'sticky', top: 0, background: colors.bg, zIndex: 10, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: colors.ink, fontSize: 15, cursor: 'pointer', padding: 4, fontFamily: 'inherit' }}>
+          <ChevronLeft size={20} /> 戻る
+        </button>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button onClick={onToggleFavorite} aria-label="お気に入り切り替え"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, display: 'flex' }}>
+            <Heart size={22} fill={recipe.favorite ? colors.favorite : 'none'} color={recipe.favorite ? colors.favorite : colors.muted} strokeWidth={2} />
+          </button>
+          <button onClick={onShare} aria-label="共有" style={{ background: 'none', border: 'none', color: colors.muted, cursor: 'pointer', padding: 6, display: 'flex' }}>
+            <Share2 size={20} strokeWidth={2} />
+          </button>
+          <button onClick={onDuplicate} aria-label="複製" style={{ background: 'none', border: 'none', color: colors.muted, cursor: 'pointer', padding: 6, display: 'flex' }}>
+            <Copy size={20} strokeWidth={2} />
+          </button>
+          <button onClick={onEdit} style={{ background: 'none', border: 'none', color: colors.accent, fontSize: 15, cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' }}>編集</button>
+        </div>
+      </div>
+
+      {recipe.photo ? (
+        <div style={{ margin: '0 16px', aspectRatio: '4/3', backgroundImage: `url(${recipe.photo})`, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 16 }} />
+      ) : (
+        <div style={{ margin: '0 16px', aspectRatio: '4/3', background: colors.accentSoft, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <BookOpen size={48} color={colors.accent} strokeWidth={1.2} />
+        </div>
+      )}
+
+      <div style={{ padding: '20px 16px' }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px 0', lineHeight: 1.3 }}>{recipe.title}</h1>
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
+          {recipe.cookTime && (
+            <span style={{ fontSize: 12, color: colors.muted, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              <Clock size={13} strokeWidth={2} /> 約{recipe.cookTime}分
+            </span>
+          )}
+          {recipe.author && (
+            <span style={{ fontSize: 12, color: colors.muted, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              <User size={13} strokeWidth={2} /> {recipe.author}
+            </span>
+          )}
+          {recipe.tags?.map(t => (
+            <span key={t} style={{ fontSize: 12, color: colors.accent, background: colors.accentSoft, padding: '3px 10px', borderRadius: 999 }}>{t}</span>
+          ))}
+        </div>
+
+        {/* 作った！ボタン + カウント */}
+        <div style={{ background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 14, padding: '14px', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 12, color: colors.muted, marginBottom: 2 }}>作った回数</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                <span style={{ fontSize: 22, fontWeight: 700, color: colors.accent, fontVariantNumeric: 'tabular-nums' }}>{cookCount}</span>
+                <span style={{ fontSize: 13, color: colors.muted }}>回</span>
+              </div>
+              {lastCookedAt && (
+                <div style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>最終：{daysAgoLabel(lastCookedAt)}</div>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <RoundButton onClick={() => onAdjustCookCount(-1)} disabled={cookCount <= 0}><Minus size={16} /></RoundButton>
+              <RoundButton onClick={() => onAdjustCookCount(1)}><Plus size={16} /></RoundButton>
+            </div>
+          </div>
+          <button onClick={onMarkCooked} style={{
+            width: '100%', background: colors.accent, color: 'white', border: 'none', borderRadius: 12,
+            padding: '12px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}>
+            <CheckCircle size={18} strokeWidth={2.2} /> 作った！
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          <button onClick={onAddToMealPrep} style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 12,
+            padding: '10px 12px', color: colors.ink, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+          }}>
+            <Utensils size={15} color={colors.accent} /> 作り置きに追加
+          </button>
+          <button onClick={handleAddRequired} style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 12,
+            padding: '10px 12px', color: colors.ink, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+          }}>
+            <ShoppingCart size={15} color={colors.accent} /> 材料を買い物へ
+          </button>
+        </div>
+
+        {hasS && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 14, padding: '12px 14px', marginBottom: 20 }}>
+            <div>
+              <div style={{ fontSize: 12, color: colors.muted, marginBottom: 2 }}>分量</div>
+              <div style={{ fontSize: 15, fontWeight: 500 }}>{servings}人分</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <RoundButton onClick={() => setServings(Math.max(1, servings - 1))} disabled={servings <= 1}><Minus size={16} /></RoundButton>
+              <RoundButton onClick={() => setServings(servings + 1)}><Plus size={16} /></RoundButton>
+            </div>
+          </div>
+        )}
+
+        {(required.length > 0 || optional.length > 0) && (
+          <section style={{ marginBottom: 24 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 10px 0' }}>材料</h2>
+            {required.length > 0 && (
+              <div style={{ background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 14, overflow: 'hidden', marginBottom: optional.length > 0 ? 10 : 0 }}>
+                {required.map((ing, i) => {
+                  const shownAmount = typeof ing.amount === 'number' ? scaleAmount(ing.amount, ratio) : ing.amount;
+                  return (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '12px 14px', borderTop: i === 0 ? 'none' : `1px solid ${colors.line}`,
+                    }}>
+                      <span style={{ fontSize: 15 }}>{ing.name}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 14, color: colors.muted, fontVariantNumeric: 'tabular-nums' }}>
+                          {shownAmount}{ing.unit}
+                        </span>
+                        <button onClick={() => onAddToShopping([buildShoppingItem(ing)])}
+                          aria-label="買い物リストに追加"
+                          style={{ background: 'none', border: 'none', color: colors.muted, cursor: 'pointer', padding: 2 }}>
+                          <Plus size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {optional.length > 0 && (
+              <>
+                <div style={{ fontSize: 12, color: colors.muted, margin: '4px 4px 6px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Sparkles size={12} strokeWidth={2} color={colors.muted} /> お好みで（あればでOK）
+                </div>
+                <div style={{ background: colors.card, border: `1px dashed ${colors.line}`, borderRadius: 14, overflow: 'hidden' }}>
+                  {optional.map((ing, i) => {
+                    const shownAmount = typeof ing.amount === 'number' ? scaleAmount(ing.amount, ratio) : ing.amount;
+                    return (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 14px', borderTop: i === 0 ? 'none' : `1px solid ${colors.line}`,
+                      }}>
+                        <span style={{ fontSize: 14, color: colors.ink }}>{ing.name}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 13, color: colors.muted, fontVariantNumeric: 'tabular-nums' }}>
+                            {shownAmount}{ing.unit}
+                          </span>
+                          <button onClick={() => onAddToShopping([buildShoppingItem(ing)])}
+                            aria-label="買い物リストに追加"
+                            style={{ background: 'none', border: 'none', color: colors.muted, cursor: 'pointer', padding: 2 }}>
+                            <Plus size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {required.length > 0 && (
+                  <button onClick={handleAddAll}
+                    style={{ marginTop: 8, background: 'none', border: 'none', color: colors.muted, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', padding: '4px 0' }}>
+                    + お好み材料も含めて買い物リストへ
+                  </button>
+                )}
+              </>
+            )}
+          </section>
+        )}
+
+        {recipe.steps.length > 0 && (
+          <section style={{ marginBottom: 24 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 10px 0' }}>作り方</h2>
+            <ol style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+              {recipe.steps.map((step, i) => (
+                <li key={i} style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+                  <div style={{
+                    flexShrink: 0, width: 26, height: 26, borderRadius: 13, background: colors.accent, color: 'white',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600,
+                  }}>{i + 1}</div>
+                  <div style={{ fontSize: 15, lineHeight: 1.65, paddingTop: 3 }}>{step}</div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+
+        {recipe.notes && (
+          <section style={{ marginBottom: 24 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 10px 0' }}>メモ</h2>
+            <div style={{ background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 14, padding: '12px 14px', fontSize: 14, lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>
+              {recipe.notes}
+            </div>
+          </section>
+        )}
+
+        {!confirmDelete ? (
+          <button onClick={() => setConfirmDelete(true)}
+            style={{ marginTop: 12, background: 'none', border: `1px solid ${colors.line}`, borderRadius: 12, padding: '10px 14px', color: colors.danger, fontSize: 14, cursor: 'pointer', width: '100%', fontFamily: 'inherit' }}>
+            削除する
+          </button>
+        ) : (
+          <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+            <button onClick={() => setConfirmDelete(false)}
+              style={{ flex: 1, background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 12, padding: '10px 14px', color: colors.ink, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>
+              キャンセル
+            </button>
+            <button onClick={onDelete}
+              style={{ flex: 1, background: colors.danger, border: 'none', borderRadius: 12, padding: '10px 14px', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              本当に削除
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RoundButton({ children, onClick, disabled }) {
+  return (
+    <button onClick={onClick} disabled={disabled} style={{
+      width: 32, height: 32, borderRadius: 16, border: `1px solid ${colors.line}`,
+      background: colors.card, color: colors.ink, cursor: disabled ? 'not-allowed' : 'pointer',
+      opacity: disabled ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>{children}</button>
+  );
+}
+
+// ---------- 編集 ----------
+function EditView({ initial, allTags, allAuthors, onCancel, onSave }) {
+  const [r, setR] = useState(initial);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
+
+  const handlePhoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const compressed = await compressImage(file);
+      setR({ ...r, photo: compressed });
+    } catch (err) {
+      alert('写真の読み込みに失敗しました');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const setIngredient = (i, patch) => {
+    const next = [...r.ingredients];
+    next[i] = { ...next[i], ...patch };
+    setR({ ...r, ingredients: next });
+  };
+  const addIngredient = () => setR({ ...r, ingredients: [...r.ingredients, { name: '', amount: '', unit: '' }] });
+  const removeIngredient = (i) => setR({ ...r, ingredients: r.ingredients.filter((_, idx) => idx !== i) });
+
+  const setStep = (i, val) => {
+    const next = [...r.steps]; next[i] = val; setR({ ...r, steps: next });
+  };
+  const addStep = () => setR({ ...r, steps: [...r.steps, ''] });
+  const removeStep = (i) => setR({ ...r, steps: r.steps.filter((_, idx) => idx !== i) });
+
+  const [tagInput, setTagInput] = useState('');
+  const addTag = () => {
+    const t = tagInput.trim();
+    if (!t || r.tags.includes(t)) { setTagInput(''); return; }
+    setR({ ...r, tags: [...r.tags, t] });
+    setTagInput('');
+  };
+  const removeTag = (t) => setR({ ...r, tags: r.tags.filter(x => x !== t) });
+
+  const handleServingsChange = (e) => {
+    const v = e.target.value;
+    if (v === '') { setR({ ...r, baseServings: '' }); return; }
+    const n = parseInt(v);
+    setR({ ...r, baseServings: isNaN(n) ? '' : Math.max(1, n) });
+  };
+
+  return (
+    <div>
+      <div style={{ position: 'sticky', top: 0, background: colors.bg, zIndex: 10, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <button onClick={onCancel} style={{ background: 'none', border: 'none', color: colors.ink, fontSize: 15, cursor: 'pointer', padding: 4, fontFamily: 'inherit' }}>キャンセル</button>
+        <button onClick={() => onSave(r)}
+          style={{ background: colors.accent, color: 'white', border: 'none', borderRadius: 10, padding: '8px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          保存
+        </button>
+      </div>
+
+      <div style={{ padding: '4px 16px 40px' }}>
+        <div onClick={() => fileRef.current?.click()}
+          style={{
+            aspectRatio: '4/3', borderRadius: 16, background: r.photo ? undefined : colors.accentSoft,
+            backgroundImage: r.photo ? `url(${r.photo})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center',
+            marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', border: r.photo ? 'none' : `1px dashed ${colors.accent}`, position: 'relative',
+          }}>
+          {!r.photo && (
+            <div style={{ textAlign: 'center', color: colors.accent }}>
+              <Camera size={28} strokeWidth={1.5} style={{ marginBottom: 4 }} />
+              <div style={{ fontSize: 13 }}>{uploading ? '処理中…' : '写真を追加'}</div>
+            </div>
+          )}
+          {r.photo && (
+            <button onClick={(e) => { e.stopPropagation(); setR({ ...r, photo: null }); }}
+              style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 14, background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
+
+        <Field label="料理名">
+          <input type="text" value={r.title} onChange={(e) => setR({ ...r, title: e.target.value })}
+            placeholder="例：肉じゃが" style={inputStyle} />
+        </Field>
+
+        <Field label="登録者">
+          <input type="text" value={r.author || ''} onChange={(e) => setR({ ...r, author: e.target.value })}
+            placeholder="例：お母さん、自分、○○の本"
+            list="author-suggestions"
+            style={{ ...inputStyle, width: '100%' }} />
+          {allAuthors.length > 0 && (
+            <datalist id="author-suggestions">
+              {allAuthors.map(a => <option key={a} value={a} />)}
+            </datalist>
+          )}
+          {allAuthors.filter(a => a !== r.author).length > 0 && (
+            <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {allAuthors.filter(a => a !== r.author).slice(0, 6).map(a => (
+                <button key={a} onClick={() => setR({ ...r, author: a })}
+                  style={{ fontSize: 12, color: colors.muted, background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 999, padding: '3px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {a}
+                </button>
+              ))}
+            </div>
+          )}
+        </Field>
+
+        <div style={{ display: 'flex', gap: 12 }}>
+          <Field label="何人分（任意）">
+            <input type="number" min="1" value={r.baseServings} placeholder="未入力"
+              onChange={handleServingsChange}
+              style={{ ...inputStyle, width: 100 }} />
+          </Field>
+          <Field label="調理時間（分）">
+            <input type="number" min="0" value={r.cookTime || ''} placeholder="30"
+              onChange={(e) => setR({ ...r, cookTime: e.target.value ? Math.max(0, parseInt(e.target.value) || 0) : '' })}
+              style={{ ...inputStyle, width: 100 }} />
+          </Field>
+        </div>
+
+        <Field label="タグ">
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+            {r.tags.map(t => (
+              <span key={t} style={{ fontSize: 13, color: colors.accent, background: colors.accentSoft, padding: '4px 12px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                {t}
+                <button onClick={() => removeTag(t)} style={{ background: 'none', border: 'none', color: colors.accent, cursor: 'pointer', padding: 0, display: 'flex' }}><X size={12} /></button>
+              </span>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input type="text" value={tagInput} onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+              placeholder="和食、時短、など" style={{ ...inputStyle, flex: 1 }} />
+            <button onClick={addTag} style={{ background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 10, padding: '0 14px', color: colors.ink, cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' }}>追加</button>
+          </div>
+          {allTags.filter(t => !r.tags.includes(t)).length > 0 && (
+            <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {allTags.filter(t => !r.tags.includes(t)).slice(0, 8).map(t => (
+                <button key={t} onClick={() => setR({ ...r, tags: [...r.tags, t] })} style={{ fontSize: 12, color: colors.muted, background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 999, padding: '3px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>+ {t}</button>
+              ))}
+            </div>
+          )}
+        </Field>
+
+        <Field label="材料">
+          {r.ingredients.map((ing, i) => (
+            <div key={i} style={{ marginBottom: 10, background: ing.optional ? colors.accentSoft : 'transparent', padding: ing.optional ? 8 : 0, borderRadius: 10 }}>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input type="text" value={ing.name} placeholder="材料"
+                  onChange={(e) => setIngredient(i, { name: e.target.value })} style={{ ...inputStyle, flex: 2 }} />
+                <input type="text" value={ing.amount} placeholder="量"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const num = parseFloat(v);
+                    setIngredient(i, { amount: !isNaN(num) && String(num) === v.trim() ? num : v });
+                  }} style={{ ...inputStyle, width: 60, textAlign: 'right' }} />
+                <input type="text" value={ing.unit} placeholder="単位"
+                  onChange={(e) => setIngredient(i, { unit: e.target.value })} style={{ ...inputStyle, width: 60 }} />
+                <button onClick={() => removeIngredient(i)} style={{ background: 'none', border: 'none', color: colors.muted, cursor: 'pointer', padding: 4 }}><X size={16} /></button>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: ing.optional ? colors.accent : colors.muted, cursor: 'pointer', userSelect: 'none' }}>
+                <input type="checkbox" checked={!!ing.optional}
+                  onChange={(e) => setIngredient(i, { optional: e.target.checked })}
+                  style={{ margin: 0, cursor: 'pointer', accentColor: colors.accent }} />
+                お好みで（あればでOK）
+              </label>
+            </div>
+          ))}
+          <button onClick={addIngredient} style={{ marginTop: 4, background: 'none', border: `1px dashed ${colors.line}`, borderRadius: 10, padding: '8px', color: colors.muted, cursor: 'pointer', width: '100%', fontSize: 13, fontFamily: 'inherit' }}>+ 材料を追加</button>
+        </Field>
+
+        <Field label="作り方">
+          {r.steps.map((step, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'flex-start' }}>
+              <div style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 13, background: colors.accentSoft, color: colors.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, marginTop: 8 }}>{i + 1}</div>
+              <textarea value={step} placeholder="手順を入力"
+                onChange={(e) => setStep(i, e.target.value)} rows={2}
+                style={{ ...inputStyle, flex: 1, resize: 'vertical', fontFamily: 'inherit' }} />
+              <button onClick={() => removeStep(i)} style={{ background: 'none', border: 'none', color: colors.muted, cursor: 'pointer', padding: 4, marginTop: 8 }}><X size={16} /></button>
+            </div>
+          ))}
+          <button onClick={addStep} style={{ marginTop: 4, background: 'none', border: `1px dashed ${colors.line}`, borderRadius: 10, padding: '8px', color: colors.muted, cursor: 'pointer', width: '100%', fontSize: 13, fontFamily: 'inherit' }}>+ 手順を追加</button>
+        </Field>
+
+        <Field label="メモ">
+          <textarea value={r.notes} onChange={(e) => setR({ ...r, notes: e.target.value })}
+            placeholder="コツ、由来、盛り付けなど" rows={3}
+            style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit', width: '100%' }} />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+const inputStyle = {
+  padding: '10px 12px', border: `1px solid ${colors.line}`, borderRadius: 10,
+  background: colors.card, fontSize: 15, color: colors.ink, outline: 'none', boxSizing: 'border-box',
+  fontFamily: 'inherit',
+};
+
+function Field({ label, children }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 12, color: colors.muted, marginBottom: 6, letterSpacing: '0.02em' }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+
+// ---------- 買い物リスト ----------
+function ShoppingView({ items, onUpdate, onMoveToTrash, onRestore, onPermanentDelete, onMoveCheckedToTrash, onEmptyTrash, onAdd }) {
+  const [input, setInput] = useState('');
+  const [showTrash, setShowTrash] = useState(false);
+  const [confirmEmpty, setConfirmEmpty] = useState(false);
+
+  const active = items.filter(i => !i.checked && !i.deletedAt);
+  const checked = items.filter(i => i.checked && !i.deletedAt);
+  const trash = items.filter(i => i.deletedAt).sort((a, b) => b.deletedAt - a.deletedAt);
+
+  const handleAdd = () => {
+    if (!input.trim()) return;
+    onAdd(input.trim());
+    setInput('');
+  };
+
+  return (
+    <div style={{ padding: '20px 16px 24px' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 20 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>買い物リスト</h1>
+        {checked.length > 0 && (
+          <button onClick={onMoveCheckedToTrash} style={{ background: 'none', border: 'none', color: colors.accent, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>済みをゴミ箱へ</button>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <input type="text" value={input} onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
+          placeholder="追加する品目" style={{ ...inputStyle, flex: 1 }} />
+        <button onClick={handleAdd} style={{ background: colors.accent, color: 'white', border: 'none', borderRadius: 10, padding: '0 18px', cursor: 'pointer', fontSize: 14, fontFamily: 'inherit', fontWeight: 600 }}>追加</button>
+      </div>
+
+      {active.length === 0 && checked.length === 0 && trash.length === 0 && (
+        <EmptyState title="リストは空です" hint="レシピの材料からも追加できます" />
+      )}
+
+      {active.length > 0 && (
+        <div style={{ background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
+          {active.map((item, i) => <ShoppingRow key={item.id} item={item} onUpdate={onUpdate} onMoveToTrash={onMoveToTrash} first={i === 0} />)}
+        </div>
+      )}
+      {checked.length > 0 && (
+        <>
+          <div style={{ fontSize: 12, color: colors.muted, marginBottom: 8, marginTop: 8 }}>済み ({checked.length})</div>
+          <div style={{ background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
+            {checked.map((item, i) => <ShoppingRow key={item.id} item={item} onUpdate={onUpdate} onMoveToTrash={onMoveToTrash} first={i === 0} />)}
+          </div>
+        </>
+      )}
+
+      {trash.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <button onClick={() => setShowTrash(!showTrash)}
+              style={{ background: 'none', border: 'none', color: colors.muted, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}>
+              <Trash2 size={13} strokeWidth={2} /> ゴミ箱 ({trash.length}) {showTrash ? '▲' : '▼'}
+            </button>
+            {showTrash && !confirmEmpty && (
+              <button onClick={() => setConfirmEmpty(true)}
+                style={{ background: 'none', border: 'none', color: colors.danger, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                空にする
+              </button>
+            )}
+            {showTrash && confirmEmpty && (
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => setConfirmEmpty(false)}
+                  style={{ background: 'none', border: 'none', color: colors.muted, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>やめる</button>
+                <button onClick={() => { onEmptyTrash(); setConfirmEmpty(false); }}
+                  style={{ background: 'none', border: 'none', color: colors.danger, fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>削除する</button>
+              </div>
+            )}
+          </div>
+          {showTrash && (
+            <>
+              <div style={{ fontSize: 11, color: colors.muted, marginBottom: 8 }}>24時間で自動的に削除されます</div>
+              <div style={{ background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 14, overflow: 'hidden' }}>
+                {trash.map((item, i) => <TrashRow key={item.id} item={item} onRestore={onRestore} onPermanentDelete={onPermanentDelete} first={i === 0} />)}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ShoppingRow({ item, onUpdate, onMoveToTrash, first }) {
+  const qty = typeof item.quantity === 'number' ? item.quantity : (parseFloat(item.quantity) || 1);
+  const changeQty = (delta) => {
+    const next = Math.max(0, Math.round((qty + delta) * 100) / 100);
+    onUpdate(item.id, { quantity: next });
+  };
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', padding: '10px 14px', gap: 10,
+      borderTop: first ? 'none' : `1px solid ${colors.line}`,
+    }}>
+      <button onClick={() => onUpdate(item.id, { checked: !item.checked })}
+        style={{
+          width: 22, height: 22, borderRadius: 11, border: `1.5px solid ${item.checked ? colors.accent : colors.line}`,
+          background: item.checked ? colors.accent : 'transparent', cursor: 'pointer', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+        }}>
+        {item.checked && <Check size={14} color="white" strokeWidth={3} />}
+      </button>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 15, textDecoration: item.checked ? 'line-through' : 'none', color: item.checked ? colors.muted : colors.ink }}>
+          {item.name}
+        </div>
+      </div>
+      {!item.checked && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: colors.bg, borderRadius: 999, padding: '2px 4px' }}>
+          <button onClick={() => changeQty(-1)} aria-label="減らす"
+            style={{ width: 24, height: 24, borderRadius: 12, border: 'none', background: 'transparent', color: colors.muted, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Minus size={13} />
+          </button>
+          <div style={{ minWidth: 40, textAlign: 'center', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
+            {qty}{item.unit || ''}
+          </div>
+          <button onClick={() => changeQty(1)} aria-label="増やす"
+            style={{ width: 24, height: 24, borderRadius: 12, border: 'none', background: 'transparent', color: colors.muted, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Plus size={13} />
+          </button>
+        </div>
+      )}
+      {item.checked && <div style={{ fontSize: 12, color: colors.muted }}>{qty}{item.unit || ''}</div>}
+      <button onClick={() => onMoveToTrash(item.id)} aria-label="ゴミ箱へ" style={{ background: 'none', border: 'none', color: colors.muted, cursor: 'pointer', padding: 4 }}>
+        <Trash2 size={16} />
+      </button>
+    </div>
+  );
+}
+
+function TrashRow({ item, onRestore, onPermanentDelete, first }) {
+  const hoursLeft = trashHoursRemaining(item.deletedAt);
+  const qty = typeof item.quantity === 'number' ? item.quantity : (parseFloat(item.quantity) || 1);
+  const urgent = hoursLeft <= 3;
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', padding: '10px 14px', gap: 10,
+      borderTop: first ? 'none' : `1px solid ${colors.line}`,
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, color: colors.muted, textDecoration: 'line-through' }}>
+          {item.name} {qty}{item.unit || ''}
+        </div>
+        <div style={{ fontSize: 11, color: urgent ? colors.warn : colors.muted, marginTop: 2 }}>
+          あと約{hoursLeft}時間で自動削除
+        </div>
+      </div>
+      <button onClick={() => onRestore(item.id)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          background: colors.accentSoft, border: 'none', color: colors.accent,
+          padding: '6px 12px', borderRadius: 999, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
+        }}>
+        <ArchiveRestore size={13} /> 戻す
+      </button>
+      <button onClick={() => onPermanentDelete(item.id)} aria-label="完全に削除"
+        style={{ background: 'none', border: 'none', color: colors.muted, cursor: 'pointer', padding: 4 }}>
+        <X size={16} />
+      </button>
+    </div>
+  );
+}
+
+// ---------- 作り置きリスト ----------
+function MealPrepView({ items, recipes, onAdd, onOpen }) {
+  const [input, setInput] = useState('');
+  const [suggestOpen, setSuggestOpen] = useState(false);
+
+  const sorted = [...items].sort((a, b) => b.madeDate - a.madeDate);
+
+  const query = input.trim().toLowerCase();
+  const suggestions = query
+    ? recipes.filter(r => r.title.toLowerCase().includes(query)).slice(0, 5)
+    : [];
+
+  const handleAddManual = async () => {
+    const name = input.trim();
+    if (!name) return;
+    await onAdd({ name });
+    setInput('');
+    setSuggestOpen(false);
+  };
+
+  const handleAddFromRecipe = async (recipe) => {
+    await onAdd({
+      name: recipe.title,
+      recipeId: recipe.id,
+      photo: recipe.photo,
+      remaining: hasServings(recipe) ? `${recipe.baseServings}人分` : '',
+    });
+    setInput('');
+    setSuggestOpen(false);
+  };
+
+  return (
+    <div style={{ padding: '20px 16px 24px' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 20 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>作り置き</h1>
+        <span style={{ fontSize: 13, color: colors.muted }}>{items.length}品</span>
+      </div>
+
+      <div style={{ position: 'relative', marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input type="text" value={input}
+            onChange={(e) => { setInput(e.target.value); setSuggestOpen(true); }}
+            onFocus={() => setSuggestOpen(true)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAddManual(); }}
+            placeholder="料理名を入力（レシピからも選べます）"
+            style={{ ...inputStyle, flex: 1 }} />
+          <button onClick={handleAddManual}
+            style={{ background: colors.accent, color: 'white', border: 'none', borderRadius: 10, padding: '0 18px', cursor: 'pointer', fontSize: 14, fontFamily: 'inherit', fontWeight: 600 }}>
+            追加
+          </button>
+        </div>
+
+        {suggestOpen && suggestions.length > 0 && (
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
+            background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 12,
+            boxShadow: '0 4px 14px rgba(0,0,0,0.08)', zIndex: 5, overflow: 'hidden',
+          }}>
+            <div style={{ fontSize: 11, color: colors.muted, padding: '8px 12px 4px' }}>レシピから追加</div>
+            {suggestions.map(r => (
+              <button key={r.id} onClick={() => handleAddFromRecipe(r)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 12px',
+                  background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                  background: r.photo ? `url(${r.photo}) center/cover` : colors.accentSoft,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {!r.photo && <BookOpen size={14} color={colors.accent} />}
+                </div>
+                <span style={{ fontSize: 14 }}>{r.title}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {items.length === 0 ? (
+        <EmptyState title="作り置きはありません" hint="料理を作ったら追加しておくと管理できます" />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {sorted.map(item => <MealPrepRow key={item.id} item={item} onOpen={() => onOpen(item)} />)}
+        </div>
+      )}
+
+      {suggestOpen && (
+        <div onClick={() => setSuggestOpen(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 4, background: 'transparent' }} />
+      )}
+    </div>
+  );
+}
+
+function MealPrepRow({ item, onOpen }) {
+  const days = daysAgo(item.madeDate);
+  const dayColor = freshnessColor(item.madeDate);
+
+  return (
+    <button onClick={onOpen} style={{
+      display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 12px',
+      background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 14,
+      cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+    }}>
+      <div style={{
+        width: 56, height: 56, borderRadius: 12, flexShrink: 0,
+        background: item.photo ? `url(${item.photo}) center/cover` : colors.accentSoft,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {!item.photo && <Utensils size={20} color={colors.accent} strokeWidth={1.5} />}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {item.name}
+        </div>
+        <div style={{ fontSize: 12, color: dayColor, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Calendar size={11} strokeWidth={2} />
+          {daysAgoLabel(item.madeDate)}
+          {days >= 5 && <span style={{ color: colors.warn }}>・早めに</span>}
+        </div>
+      </div>
+      {item.remaining && (
+        <div style={{
+          flexShrink: 0, background: colors.accentSoft, color: colors.accent,
+          padding: '6px 12px', borderRadius: 999, fontSize: 13, fontWeight: 600,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1,
+        }}>
+          <span style={{ fontSize: 9, fontWeight: 500, opacity: 0.8, marginBottom: 1 }}>残り</span>
+          <span>{item.remaining}</span>
+        </div>
+      )}
+    </button>
+  );
+}
+
+// ---------- 作り置き詳細モーダル ----------
+function MealPrepDetailModal({ item, onClose, onUpdate, onRemove, onOpenRecipe }) {
+  const [name, setName] = useState(item.name);
+  const [date, setDate] = useState(toDateInputValue(item.madeDate));
+  const [remaining, setRemaining] = useState(item.remaining || '');
+  const [note, setNote] = useState(item.note || '');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const handleSave = async () => {
+    await onUpdate(item.id, {
+      name: name.trim() || item.name,
+      madeDate: fromDateInputValue(date),
+      remaining: remaining.trim(),
+      note,
+    });
+    onClose();
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100,
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center', fontFamily: fontStack,
+    }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: colors.bg, borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 640,
+        padding: '20px 16px', maxHeight: '90vh', overflowY: 'auto',
+        paddingBottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>作り置きの編集</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: colors.muted, cursor: 'pointer', padding: 4, display: 'flex' }}>
+            <X size={22} />
+          </button>
+        </div>
+
+        {item.photo && (
+          <div style={{ aspectRatio: '4/3', backgroundImage: `url(${item.photo})`, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 14, marginBottom: 16 }} />
+        )}
+
+        <Field label="料理名">
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, width: '100%' }} />
+        </Field>
+
+        <Field label="残り（分量・数量）">
+          <input type="text" value={remaining} onChange={(e) => setRemaining(e.target.value)}
+            placeholder="例：2人分、半分、3切れ"
+            style={{ ...inputStyle, width: '100%' }} />
+          <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {['1人分', '2人分', '半分', '少し'].map(preset => (
+              <button key={preset} onClick={() => setRemaining(preset)}
+                style={{
+                  fontSize: 12, color: remaining === preset ? colors.accent : colors.muted,
+                  background: remaining === preset ? colors.accentSoft : colors.card,
+                  border: `1px solid ${remaining === preset ? colors.accent : colors.line}`,
+                  borderRadius: 999, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                {preset}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <Field label="作った日">
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ ...inputStyle, width: '100%' }} />
+          <div style={{ fontSize: 12, color: freshnessColor(fromDateInputValue(date)), marginTop: 6 }}>
+            {daysAgoLabel(fromDateInputValue(date))}
+          </div>
+        </Field>
+
+        <Field label="メモ">
+          <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2}
+            placeholder="保存方法、賞味の目安など"
+            style={{ ...inputStyle, width: '100%', resize: 'vertical', fontFamily: 'inherit' }} />
+        </Field>
+
+        {item.recipeId && (
+          <button onClick={() => onOpenRecipe(item.recipeId)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%',
+              background: colors.accentSoft, border: 'none', borderRadius: 12, padding: '10px 12px',
+              color: colors.accent, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 12, fontWeight: 500,
+            }}>
+            <BookOpen size={15} /> レシピを見る
+          </button>
+        )}
+
+        {!confirmDelete ? (
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button onClick={() => setConfirmDelete(true)}
+              style={{
+                flex: 1, background: 'none', border: `1px solid ${colors.line}`, borderRadius: 12,
+                padding: '12px', color: colors.danger, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              食べ切った / 削除
+            </button>
+            <button onClick={handleSave}
+              style={{
+                flex: 1, background: colors.accent, color: 'white', border: 'none', borderRadius: 12,
+                padding: '12px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              保存
+            </button>
+          </div>
+        ) : (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 13, color: colors.muted, textAlign: 'center', marginBottom: 10 }}>
+              本当に削除しますか？
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setConfirmDelete(false)}
+                style={{
+                  flex: 1, background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 12,
+                  padding: '12px', color: colors.ink, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                キャンセル
+              </button>
+              <button onClick={() => onRemove(item.id)}
+                style={{
+                  flex: 1, background: colors.danger, color: 'white', border: 'none', borderRadius: 12,
+                  padding: '12px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                削除する
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------- ボトムナビ ----------
+function BottomNav({ tab, onChange, shoppingCount, mealPrepCount }) {
+  const items = [
+    { key: 'recipes', label: 'レシピ', Icon: BookOpen },
+    { key: 'mealprep', label: '作り置き', Icon: Utensils, badge: mealPrepCount },
+    { key: 'shopping', label: '買い物', Icon: ShoppingCart, badge: shoppingCount },
+    { key: 'ranking', label: 'ランキング', Icon: Trophy },
+  ];
+  return (
+    <nav style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0, background: colors.card,
+      borderTop: `1px solid ${colors.line}`, display: 'flex', justifyContent: 'center',
+      paddingBottom: 'env(safe-area-inset-bottom, 0px)', fontFamily: fontStack,
+    }}>
+      <div style={{ display: 'flex', width: '100%', maxWidth: 640 }}>
+        {items.map(({ key, label, Icon, badge }) => (
+          <button key={key} onClick={() => onChange(key)}
+            style={{
+              flex: 1, padding: '10px 0 12px', background: 'none', border: 'none',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+              color: tab === key ? colors.accent : colors.muted, cursor: 'pointer', position: 'relative',
+              fontFamily: 'inherit',
+            }}>
+            <div style={{ position: 'relative' }}>
+              <Icon size={22} strokeWidth={tab === key ? 2 : 1.6} />
+              {badge > 0 && (
+                <span style={{
+                  position: 'absolute', top: -4, right: -8, background: colors.accent, color: 'white',
+                  fontSize: 10, fontWeight: 600, minWidth: 16, height: 16, borderRadius: 8,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px',
+                }}>{badge}</span>
+              )}
+            </div>
+            <span style={{ fontSize: 11 }}>{label}</span>
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+// ========== 設定モーダル（グループ管理付き） ==========
+function SettingsModal({ onClose, onExport, onImport, onMerge, onLeaveGroup, groupCode, stats }) {
+  const importRef = useRef(null);
+  const mergeRef = useRef(null);
+  const [confirmImport, setConfirmImport] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+
+  const handleCopyCode = async () => {
+    const ok = await copyToClipboard(groupCode);
+    if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1500); }
+  };
+  const handleShare = async () => {
+    const url = location.origin + location.pathname;
+    const text = `レシピ帳の招待コード：${groupCode}\n${url}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'レシピ帳', text }); return; } catch {}
+    }
+    const ok = await copyToClipboard(text);
+    if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1500); }
+  };
+
+  const handleFileForImport = (e) => {
+    const file = e.target.files?.[0];
+    if (file) setConfirmImport({ file, mode: 'replace' });
+    e.target.value = '';
+  };
+  const handleFileForMerge = (e) => {
+    const file = e.target.files?.[0];
+    if (file) setConfirmImport({ file, mode: 'merge' });
+    e.target.value = '';
+  };
+  const doImport = async () => {
+    if (!confirmImport) return;
+    if (confirmImport.mode === 'replace') await onImport(confirmImport.file);
+    else await onMerge(confirmImport.file);
+    setConfirmImport(null);
+    onClose();
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', fontFamily: fontStack }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: colors.bg, borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 640, padding: '20px 16px', maxHeight: '90vh', overflowY: 'auto', paddingBottom: 'calc(20px + env(safe-area-inset-bottom, 0px))' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>設定</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: colors.muted, cursor: 'pointer', padding: 4, display: 'flex' }}>
+            <X size={22} />
+          </button>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, color: colors.muted, marginBottom: 8, letterSpacing: '0.02em' }}>グループ</div>
+          <div style={{ background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 14, padding: 14 }}>
+            <div style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>招待コード</div>
+            <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.1em', textAlign: 'center', padding: 10, background: colors.accentSoft, color: colors.accent, borderRadius: 10, marginBottom: 10, fontVariantNumeric: 'tabular-nums' }}>{groupCode}</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={handleCopyCode}
+                style={{ flex: 1, background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 10, padding: 10, color: colors.ink, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <Copy size={14} /> {copied ? 'コピーしました' : 'コードをコピー'}
+              </button>
+              <button onClick={handleShare}
+                style={{ flex: 1, background: colors.accent, color: 'white', border: 'none', borderRadius: 10, padding: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <Share2 size={14} /> 家族に共有
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: colors.muted, marginTop: 8, lineHeight: 1.5 }}>
+              家族はこのアプリを開き、このコードで参加できます。
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 14, padding: 14, marginBottom: 20 }}>
+          <div style={{ fontSize: 12, color: colors.muted, marginBottom: 8 }}>データ</div>
+          <div style={{ fontSize: 14, lineHeight: 1.8 }}>
+            レシピ <b style={{ fontVariantNumeric: 'tabular-nums' }}>{stats.recipes}</b> 件<br />
+            作り置き <b style={{ fontVariantNumeric: 'tabular-nums' }}>{stats.mealPreps}</b> 品<br />
+            買い物リスト <b style={{ fontVariantNumeric: 'tabular-nums' }}>{stats.shopping}</b> 品目
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, color: colors.muted, marginBottom: 8, letterSpacing: '0.02em' }}>バックアップ</div>
+          <button onClick={onExport}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 12, padding: 14, color: colors.ink, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', marginBottom: 8 }}>
+            <Download size={18} color={colors.accent} strokeWidth={1.8} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>エクスポート</div>
+              <div style={{ fontSize: 12, color: colors.muted }}>全データをJSONで保存</div>
+            </div>
+          </button>
+          <button onClick={() => mergeRef.current?.click()}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 12, padding: 14, color: colors.ink, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', marginBottom: 8 }}>
+            <Plus size={18} color={colors.accent} strokeWidth={1.8} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>取り込み（追加）</div>
+              <div style={{ fontSize: 12, color: colors.muted }}>今のデータに足す（IDが同じものはスキップ）</div>
+            </div>
+          </button>
+          <input ref={mergeRef} type="file" accept="application/json" onChange={handleFileForMerge} style={{ display: 'none' }} />
+          <button onClick={() => importRef.current?.click()}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 12, padding: 14, color: colors.ink, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+            <Upload size={18} color={colors.warn} strokeWidth={1.8} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>復元（上書き）</div>
+              <div style={{ fontSize: 12, color: colors.muted }}>今のデータを消してファイルの内容に置き換え</div>
+            </div>
+          </button>
+          <input ref={importRef} type="file" accept="application/json" onChange={handleFileForImport} style={{ display: 'none' }} />
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          {!confirmLeave ? (
+            <button onClick={() => setConfirmLeave(true)}
+              style={{ width: '100%', background: 'none', border: `1px solid ${colors.line}`, borderRadius: 12, padding: 12, color: colors.danger, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <LogOut size={15} /> このグループを離れる
+            </button>
+          ) : (
+            <div>
+              <div style={{ fontSize: 13, color: colors.muted, textAlign: 'center', marginBottom: 10, lineHeight: 1.5 }}>
+                このデバイスからグループを離れます。<br />データはクラウドに残るので、コードで再参加できます。
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setConfirmLeave(false)}
+                  style={{ flex: 1, background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 12, padding: 12, color: colors.ink, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  キャンセル
+                </button>
+                <button onClick={() => { onLeaveGroup(); onClose(); }}
+                  style={{ flex: 1, background: colors.danger, color: 'white', border: 'none', borderRadius: 12, padding: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  離れる
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {confirmImport && (
+          <div onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div style={{ background: colors.bg, borderRadius: 16, padding: 20, maxWidth: 340, width: '100%' }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 10px 0' }}>
+                {confirmImport.mode === 'replace' ? '上書きしますか？' : '取り込みますか？'}
+              </h3>
+              <p style={{ fontSize: 13, color: colors.muted, lineHeight: 1.6, margin: '0 0 16px 0' }}>
+                {confirmImport.mode === 'replace'
+                  ? 'グループ内の全データを消し、ファイルの内容に置き換えます。他の家族の画面にも反映されます。'
+                  : 'ファイル内のデータを今のデータに追加します。IDが同じものはスキップされます。'}
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setConfirmImport(null)}
+                  style={{ flex: 1, background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 10, padding: 10, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', color: colors.ink }}>キャンセル</button>
+                <button onClick={doImport}
+                  style={{ flex: 1, background: confirmImport.mode === 'replace' ? colors.warn : colors.accent, color: 'white', border: 'none', borderRadius: 10, padding: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>実行</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ========== トースト（一時通知） ==========
+function Toast({ toast, onDismiss }) {
+  return (
+    <div style={{
+      position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
+      background: colors.ink, color: 'white', padding: '10px 14px', borderRadius: 24,
+      fontSize: 13, display: 'flex', alignItems: 'center', gap: 12, maxWidth: 'calc(100% - 32px)',
+      boxShadow: '0 4px 14px rgba(0,0,0,0.25)', zIndex: 300, fontFamily: fontStack,
+      animation: 'toastIn 0.2s ease-out',
+    }}>
+      <style>{`@keyframes toastIn { from { transform: translate(-50%, 8px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }`}</style>
+      <span style={{ flex: 1 }}>{toast.message}</span>
+      {toast.undo && (
+        <button onClick={() => { toast.undo(); onDismiss(); }}
+          style={{ background: 'none', border: 'none', color: '#8FBFA1', fontWeight: 600, cursor: 'pointer', padding: 4, fontFamily: 'inherit', fontSize: 13, whiteSpace: 'nowrap' }}>
+          取り消す
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ========== ランキング ==========
+function RankingView({ recipes, onOpenRecipe }) {
+  const cooked = recipes.filter(r => (r.cookCount || 0) > 0);
+  const notCooked = recipes.filter(r => (r.cookCount || 0) === 0);
+  const favorites = recipes.filter(r => r.favorite);
+
+  const mostCooked = [...cooked].sort((a, b) => (b.cookCount || 0) - (a.cookCount || 0)).slice(0, 10);
+  const staleCooked = [...cooked]
+    .filter(r => r.lastCookedAt && daysAgo(r.lastCookedAt) >= 14)
+    .sort((a, b) => (a.lastCookedAt || 0) - (b.lastCookedAt || 0))
+    .slice(0, 5);
+  const recentAdded = [...notCooked].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 10);
+
+  // 材料の使用頻度（作った回数 × 使用レシピ数）
+  const ingCount = {};
+  cooked.forEach(r => {
+    (r.ingredients || []).forEach(i => {
+      const name = (i.name || '').trim();
+      if (!name) return;
+      ingCount[name] = (ingCount[name] || 0) + (r.cookCount || 0);
+    });
+  });
+  const topIngredients = Object.entries(ingCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+
+  // よく登場する登録者
+  const authorCount = {};
+  cooked.forEach(r => {
+    if (!r.author) return;
+    authorCount[r.author] = (authorCount[r.author] || 0) + (r.cookCount || 0);
+  });
+  const topAuthors = Object.entries(authorCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  const totalCooked = cooked.reduce((sum, r) => sum + (r.cookCount || 0), 0);
+
+  return (
+    <div style={{ padding: '20px 16px 24px' }}>
+      <h1 style={{ fontSize: 28, fontWeight: 700, margin: '0 0 8px 0', letterSpacing: '-0.01em' }}>ランキング</h1>
+      <p style={{ fontSize: 13, color: colors.muted, margin: '0 0 20px 0' }}>
+        これまでに <b style={{ fontVariantNumeric: 'tabular-nums' }}>{totalCooked}</b> 回、
+        <b style={{ fontVariantNumeric: 'tabular-nums' }}> {cooked.length}</b> 品のレシピを作りました
+      </p>
+
+      {recipes.length === 0 && <EmptyState title="まだレシピがありません" hint="レシピを追加すると、ここに集計が出ます" />}
+
+      {mostCooked.length > 0 && (
+        <RankingSection title="よく作るレシピ" icon={<Trophy size={16} color={colors.warn} />}>
+          {mostCooked.map((r, i) => (
+            <RankingRow key={r.id} rank={i + 1} onClick={() => onOpenRecipe(r.id)}
+              photo={r.photo} title={r.title} subtitle={r.author}
+              value={`${r.cookCount}回`} />
+          ))}
+        </RankingSection>
+      )}
+
+      {staleCooked.length > 0 && (
+        <RankingSection title="しばらく作ってないレシピ" icon={<Moon size={16} color={colors.muted} />}
+          hint="久しぶりに作りませんか？">
+          {staleCooked.map((r, i) => (
+            <RankingRow key={r.id} rank={i + 1} onClick={() => onOpenRecipe(r.id)}
+              photo={r.photo} title={r.title} subtitle={r.author}
+              value={daysAgoLabel(r.lastCookedAt)} valueColor={colors.warn} />
+          ))}
+        </RankingSection>
+      )}
+
+      {recentAdded.length > 0 && (
+        <RankingSection title="まだ作ってないレシピ" icon={<Sparkles size={16} color={colors.accent} />}
+          hint={`合計 ${notCooked.length} 品`}>
+          {recentAdded.map((r, i) => (
+            <RankingRow key={r.id} rank={i + 1} onClick={() => onOpenRecipe(r.id)}
+              photo={r.photo} title={r.title} subtitle={r.author}
+              value="0回" valueColor={colors.muted} />
+          ))}
+        </RankingSection>
+      )}
+
+      {favorites.length > 0 && (
+        <RankingSection title="お気に入り" icon={<Heart size={15} fill={colors.favorite} color={colors.favorite} strokeWidth={2} />}>
+          {favorites.map((r, i) => (
+            <RankingRow key={r.id} rank={i + 1} onClick={() => onOpenRecipe(r.id)}
+              photo={r.photo} title={r.title} subtitle={r.author}
+              value={(r.cookCount || 0) > 0 ? `${r.cookCount}回` : '—'} />
+          ))}
+        </RankingSection>
+      )}
+
+      {topIngredients.length > 0 && (
+        <RankingSection title="よく使う材料" icon={<Salad size={16} color={colors.accent} />}
+          hint="作った回数から集計">
+          <div style={{ background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 14, overflow: 'hidden' }}>
+            {topIngredients.map(([name, count], i) => (
+              <div key={name} style={{
+                display: 'flex', alignItems: 'center', padding: '10px 14px', gap: 12,
+                borderTop: i === 0 ? 'none' : `1px solid ${colors.line}`,
+              }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: colors.muted, width: 20, fontVariantNumeric: 'tabular-nums' }}>{i + 1}</span>
+                <span style={{ flex: 1, fontSize: 14 }}>{name}</span>
+                <span style={{ fontSize: 13, color: colors.accent, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{count}回</span>
+              </div>
+            ))}
+          </div>
+        </RankingSection>
+      )}
+
+      {topAuthors.length > 0 && (
+        <RankingSection title="よく作る登録者" icon={<User size={15} color={colors.accent} />}>
+          <div style={{ background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 14, overflow: 'hidden' }}>
+            {topAuthors.map(([name, count], i) => (
+              <div key={name} style={{
+                display: 'flex', alignItems: 'center', padding: '10px 14px', gap: 12,
+                borderTop: i === 0 ? 'none' : `1px solid ${colors.line}`,
+              }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: colors.muted, width: 20, fontVariantNumeric: 'tabular-nums' }}>{i + 1}</span>
+                <span style={{ flex: 1, fontSize: 14 }}>{name}</span>
+                <span style={{ fontSize: 13, color: colors.accent, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{count}回</span>
+              </div>
+            ))}
+          </div>
+        </RankingSection>
+      )}
+    </div>
+  );
+}
+
+function RankingSection({ title, icon, hint, children }) {
+  return (
+    <section style={{ marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: hint ? 2 : 10 }}>
+        {icon}
+        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{title}</h2>
+      </div>
+      {hint && <div style={{ fontSize: 11, color: colors.muted, marginBottom: 10, marginLeft: 22 }}>{hint}</div>}
+      {children}
+    </section>
+  );
+}
+
+function RankingRow({ rank, photo, title, subtitle, value, valueColor, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      display: 'flex', alignItems: 'center', width: '100%', gap: 10, padding: '8px 12px',
+      background: colors.card, border: `1px solid ${colors.line}`, borderRadius: 12,
+      marginBottom: 6, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+    }}>
+      <span style={{
+        width: 22, height: 22, borderRadius: 11, background: rank <= 3 ? colors.accent : colors.accentSoft,
+        color: rank <= 3 ? 'white' : colors.accent, fontSize: 12, fontWeight: 700,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      }}>{rank}</span>
+      {photo ? (
+        <div style={{ width: 40, height: 40, borderRadius: 8, backgroundImage: `url(${photo})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 }} />
+      ) : (
+        <div style={{ width: 40, height: 40, borderRadius: 8, background: colors.accentSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <BookOpen size={18} color={colors.accent} strokeWidth={1.5} />
+        </div>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: colors.ink }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 11, color: colors.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{subtitle}</div>}
+      </div>
+      <span style={{ fontSize: 13, color: valueColor || colors.accent, fontVariantNumeric: 'tabular-nums', fontWeight: 500, flexShrink: 0 }}>{value}</span>
+    </button>
+  );
+}
+
+// ========== レンダリング ==========
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+</script>
+</body>
+</html>
