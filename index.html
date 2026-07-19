@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>レシピ帳</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" href="favicon.png" type="image/png">
+  <meta name="theme-color" content="#5B7C5D">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="レシピ">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="format-detection" content="telephone=no">
+
+  <style>
+    html, body { margin: 0; padding: 0; }
+    * { box-sizing: border-box; }
+    body {
+      background: #FBFAF7;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: none;
+    }
+    .initial-loader {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      color: #6B7280; font-family: system-ui, sans-serif; font-size: 14px;
+    }
+    input, textarea, button { font-family: inherit; }
+    input, textarea { -webkit-appearance: none; appearance: none; }
+  </style>
+
+  <!-- ▼▼▼ Firebase設定：ここをあなたのプロジェクトの設定に書き換えてください ▼▼▼ -->
+  <script>
+    window.FIREBASE_CONFIG = {
+      apiKey: "AIzaSyClyhJxvYrCGYNrh3JgkJG3e1heWY22VgE",
+      authDomain: "recipe-manage-1eb55.firebaseapp.com",
+      projectId: "recipe-manage-1eb55",
+      storageBucket: "recipe-manage-1eb55.firebasestorage.app",
+      messagingSenderId: "788163948857",
+      appId: "1:788163948857:web:a536a857138c3ed64078e8"
+    };
+  </script>
+  <!-- ▲▲▲ ここまで ▲▲▲ -->
+
+  <!-- React + Firebase -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <div id="root">
+    <div class="initial-loader">読み込み中…</div>
+  </div>
+
+  <!-- アプリ本体（事前コンパイル済み） -->
+  <script src="app.compiled.js"></script>
+</body>
+</html>
